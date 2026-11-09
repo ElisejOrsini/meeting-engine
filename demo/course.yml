@@ -1,0 +1,8 @@
+# Course settings. See docs/content-format.md for every option.
+name: "Applied Widgetry (demo)"
+description: |
+  TA team meetings for the made-up course *Applied Widgetry*. Everything on
+  this site is example content that shows what the meeting engine can do.
+links:
+  - title: Engine source on GitHub
+    url: https://github.com/ElisejOrsini/meeting-engine

@@ -1,0 +1,37 @@
+# Past demo meeting: has a summary.md and decisions.yml.
+title: Exercise session format
+date: 2026-10-27
+time: "13:15"
+duration: 45
+location: Room CAB G 52
+responses:
+  reveal: anytime
+
+agenda:
+  - title: How the first weeks went
+    minutes: 10
+  - title: Format of exercise sessions
+    minutes: 15
+    question: session-format
+  - title: Attendance tracking
+    minutes: 10
+    question: attendance
+  - title: Recording sessions
+    minutes: 10
+    question: recordings
+
+questions:
+  - id: session-format
+    text: Should exercise sessions start with a recap of the lecture or go straight to problems?
+    survey:
+      - id: format
+        type: single
+        label: Your preference
+        options:
+          - Short recap (max 10 minutes), then problems
+          - Straight to problems
+          - Leave it to each TA
+  - id: attendance
+    text: Do we track attendance in exercise sessions?
+  - id: recordings
+    text: Should exercise sessions be recorded?

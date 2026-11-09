@@ -1,0 +1,14 @@
+decisions:
+  - id: short-recap
+    question: session-format
+    decision: Every exercise session starts with a recap of at most 10 minutes, then moves on to problems.
+    rationale: Most groups already do this, and students said the recap helps them follow the problems.
+
+  - id: no-attendance
+    question: attendance
+    decision: We do not track attendance.
+    rationale: Attendance is voluntary, and tracking it would take time away from teaching.
+
+  - id: shared-slides
+    decision: TAs use one shared set of recap slides, kept in the course drive.
+    rationale: Keeps recaps consistent across groups and saves preparation time.

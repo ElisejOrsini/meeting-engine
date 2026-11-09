@@ -1,0 +1,30 @@
+# Template for a new meeting. Folders starting with "_" are not published.
+# To add a meeting: copy this folder to meetings/YYYY-MM-DD-short-name/
+# and fill it in. All options are explained in docs/content-format.md.
+title: Meeting title
+date: 2026-01-31
+time: "14:00"
+duration: 60
+location: Room or link
+responses:
+  reveal: after_answering   # or: anytime
+
+agenda:
+  - title: First agenda item
+    minutes: 10
+    question: first-question
+
+questions:
+  - id: first-question
+    text: What do we need to decide?
+    details: Optional extra context, in Markdown.
+    survey:
+      - id: choice
+        type: single        # single | multiple | text
+        label: Your preference
+        options:
+          - Option A
+          - Option B
+      - id: comment
+        type: text
+        label: Comments

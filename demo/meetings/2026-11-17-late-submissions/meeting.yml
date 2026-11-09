@@ -1,0 +1,60 @@
+# Upcoming demo meeting: shows pre-reading, survey questions and an agenda.
+title: Late submission policy
+date: 2026-11-17
+time: "14:00"
+duration: 60
+location: Room HG E 33 and online
+responses:
+  reveal: after_answering   # others' answers unlock after you submit your own
+
+agenda:
+  - title: Welcome and goals for today
+    minutes: 5
+  - title: Survey results on grace periods
+    minutes: 20
+    question: grace-period
+    notes: Start with the survey numbers, then open discussion.
+  - title: Penalty after the grace period
+    minutes: 15
+    question: penalty
+  - title: Extension requests
+    minutes: 15
+    question: extensions
+  - title: Wrap-up and who does what
+    minutes: 5
+
+questions:
+  - id: grace-period
+    text: Should we allow a grace period for homework submissions?
+    details: |
+      Last semester **23%** of late submissions arrived within one hour of the
+      deadline, mostly because of upload problems.
+    survey:
+      - id: preference
+        type: single
+        label: Which grace period would you prefer?
+        options:
+          - No grace period
+          - 15 minutes
+          - 1 hour
+          - 24 hours
+        required: true
+      - id: reason
+        type: text
+        label: Why? Any concerns?
+
+  - id: penalty
+    text: What should happen to submissions that arrive after the grace period?
+    survey:
+      - id: options
+        type: multiple
+        label: Which of these would you support?
+        options:
+          - Not accepted at all
+          - 10% deduction per day
+          - Accepted but only graded pass/fail
+          - Decided case by case by the head TA
+
+  - id: extensions
+    text: Who approves extension requests, and how fast must we answer?
+    details: Currently every TA handles requests from their own group, with no deadline for answering.

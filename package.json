@@ -1,0 +1,21 @@
+{
+  "name": "meeting-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static site engine for team meetings: pre-meeting surveys, in-meeting guide, post-meeting summaries and decisions.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build/build.mjs --content demo --out _site",
+    "check": "node build/build.mjs --content demo --check",
+    "dev": "node scripts/dev-server.mjs --content demo",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "js-yaml": "5.5.0",
+    "marked": "18.1.2"
+  }
+}

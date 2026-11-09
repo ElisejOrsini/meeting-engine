@@ -1,0 +1,47 @@
+# meeting-engine as a GitHub Action.
+#
+# Course repositories use it in their deploy workflow; the full workflow is
+# in README.md ("Using the engine in a course repository"). The key line is:
+#
+#   - uses: ElisejOrsini/meeting-engine@v0.1.0
+#
+# The version after "@" pins the engine. GitHub downloads the engine at exactly
+# that version, so updating a course means changing that one tag.
+
+name: Meeting Engine
+description: Build a static meeting website (pre-meeting, in-meeting, post-meeting, decisions) from Markdown and YAML files.
+author: ElisejOrsini
+branding:
+  icon: calendar
+  color: blue
+
+inputs:
+  content-dir:
+    description: Folder that contains course.yml and meetings/ (relative to the repository root).
+    required: false
+    default: "."
+  out-dir:
+    description: Folder to write the built website to. It is deleted and recreated.
+    required: false
+    default: _site
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    # $GITHUB_ACTION_PATH (not the github.action_path expression) also works in
+    # container jobs. --ignore-scripts: dependencies never run install scripts.
+    - name: Install engine dependencies
+      shell: bash
+      run: cd "$GITHUB_ACTION_PATH" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+    - name: Build site
+      shell: bash
+      env:
+        CONTENT_DIR: ${{ inputs.content-dir }}
+        OUT_DIR: ${{ inputs.out-dir }}
+      run: node "$GITHUB_ACTION_PATH/build/build.mjs" --content "$CONTENT_DIR" --out "$OUT_DIR"
