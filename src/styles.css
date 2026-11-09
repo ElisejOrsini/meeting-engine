@@ -188,7 +188,8 @@ input:disabled, textarea:disabled, input:disabled + span { opacity: 0.65; }
 
 @media (max-width: 520px) {
   .agenda-item { grid-template-columns: 1fr; gap: 0; }
-  .tabs a { padding: 10px 8px; font-size: 0.95rem; }
+  .tabs { gap: 0; }
+  .tabs a { padding: 10px 6px; font-size: 0.9rem; }
   h1 { font-size: 1.6rem; }
 }
 
