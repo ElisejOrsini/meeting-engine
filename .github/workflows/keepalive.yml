@@ -1,0 +1,36 @@
+# Keeps the Supabase project behind the demo (and the course sites that share
+# it) awake. Free Supabase projects are paused after about a week without
+# activity; this records one heartbeat a day with the engine's keep-alive
+# action (keepalive/action.yml), using only the publishable key.
+#
+# It only covers the project named in demo/course.yml. Another Supabase
+# project needs its own daily heartbeat (see docs/backend-setup.md).
+#
+# If the project was paused anyway, this run fails and GitHub emails you. Then
+# open the project in the Supabase dashboard and click "Restore project".
+#
+# Note: GitHub switches off scheduled workflows in public repositories after
+# 60 days without any commit. If that happens, re-enable it under
+# Actions → Keep backend awake → Enable workflow.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # every day at 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Record heartbeat
+        uses: ./keepalive
+        with:
+          content-dir: demo

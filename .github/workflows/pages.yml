@@ -42,16 +42,32 @@ jobs:
         with:
           path: _site
 
+  # The github-pages environment only runs for main, and holds the
+  # SUPABASE_SECRET_KEY secret, so the key is only used here. "actions: read"
+  # lets the sync check that environment's branch rule before using the key.
   deploy:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      actions: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Copy the demo's team list to the backend
+        uses: ./sync
+        with:
+          content-dir: demo
+          supabase-url: https://pgupsbgknzxrbkgreoqm.supabase.co
+          supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

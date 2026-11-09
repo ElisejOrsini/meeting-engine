@@ -8,6 +8,7 @@
 
 import { realpathSync } from 'node:fs';
 import { cp, lstat, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -18,6 +19,12 @@ const ENGINE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const SRC_DIR = path.join(ENGINE_ROOT, 'src');
 // Written into every output folder. The build only deletes a folder that has it.
 const OUTPUT_MARKER = '.meeting-engine-output';
+const require = createRequire(import.meta.url);
+
+/** The Content-Security-Policy connect-src: the site itself, plus the backend if there is one. */
+export function connectSrc(backend) {
+  return backend ? `'self' ${backend.url}` : `'self'`;
+}
 
 export async function engineVersion() {
   const pkg = JSON.parse(await readFile(path.join(ENGINE_ROOT, 'package.json'), 'utf8'));
@@ -92,8 +99,20 @@ export async function build({ contentDir, outDir, check = false, log = console }
   const indexFile = path.join(out, 'index.html');
   const index = await readFile(indexFile, 'utf8');
   const courseName = escapeHtml(result.site.course.name);
-  // A replacer function, so "$&" etc. in the name are not treated as patterns.
-  await writeFile(indexFile, index.replaceAll('{{COURSE_NAME}}', () => courseName));
+  // Replacer functions, so "$&" etc. in the name are not treated as patterns.
+  await writeFile(indexFile, index
+    .replaceAll('{{COURSE_NAME}}', () => courseName)
+    .replaceAll('{{CONNECT_SRC}}', () => connectSrc(result.site.backend))); // URL checked by the loader
+
+  if (result.site.backend) {
+    // The Supabase browser client (pinned in package.json), served from the
+    // site itself so the page's script policy can stay "own origin only".
+    const client = require.resolve('@supabase/supabase-js/dist/umd/supabase.js');
+    await mkdir(path.join(out, 'vendor'), { recursive: true });
+    await cp(client, path.join(out, 'vendor', 'supabase.js'));
+    await cp(path.join(path.dirname(require.resolve('@supabase/supabase-js/package.json')), 'LICENSE'),
+      path.join(out, 'vendor', 'supabase.LICENSE.txt'));
+  }
 
   await mkdir(path.join(out, 'data'), { recursive: true });
   await writeFile(path.join(out, 'data', 'site.json'), JSON.stringify(result.site));

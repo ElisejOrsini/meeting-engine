@@ -1,0 +1,49 @@
+# meeting-engine: keep a free Supabase project awake.
+#
+# Free Supabase projects pause after about a week without activity. Run this
+# once a day from any one repository that uses the project (it only needs the
+# publishable key from course.yml, no secrets):
+#
+#   on:
+#     schedule:
+#       - cron: "17 6 * * *"
+#   jobs:
+#     heartbeat:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v7
+#           with:
+#             persist-credentials: false
+#         - uses: ElisejOrsini/meeting-engine/keepalive@v0.2.0
+
+name: Meeting Engine keep-alive
+description: Record a daily heartbeat in a meeting-engine site's Supabase backend, so a free project isn't paused.
+author: ElisejOrsini
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  content-dir:
+    description: Folder that contains course.yml (relative to the repository root).
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    # The engine is the folder above this one.
+    - name: Install engine dependencies
+      shell: bash
+      run: cd "$GITHUB_ACTION_PATH/.." && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+    - name: Record heartbeat
+      shell: bash
+      env:
+        CONTENT_DIR: ${{ inputs.content-dir }}
+      run: node "$GITHUB_ACTION_PATH/../build/backend.mjs" keepalive --content "$CONTENT_DIR"

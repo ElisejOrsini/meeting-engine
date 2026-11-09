@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src {{CONNECT_SRC}}; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>{{COURSE_NAME}}</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -15,12 +15,16 @@
   <header class="site-header">
     <div class="wrap header-inner">
       <a class="course-name" href="#/">{{COURSE_NAME}}</a>
-      <nav class="site-nav" aria-label="Main">
-        <a href="#/" data-nav="meetings">Meetings</a>
-        <a href="#/decisions" data-nav="decisions">Decisions</a>
-      </nav>
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Main">
+          <a href="#/" data-nav="meetings">Meetings</a>
+          <a href="#/decisions" data-nav="decisions">Decisions</a>
+        </nav>
+        <div class="account" id="account" hidden></div>
+      </div>
     </div>
   </header>
+  <div class="wrap site-notice" id="site-notice" role="status"></div>
   <main id="main" class="wrap" tabindex="-1">
     <p class="muted">Loading…</p>
     <noscript><p>This site needs JavaScript to show meetings.</p></noscript>

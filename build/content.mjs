@@ -8,6 +8,7 @@
 
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { load, CORE_SCHEMA } from 'js-yaml';
 import { createMarkdown } from './markdown.mjs';
 
@@ -23,6 +24,12 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const FIELD_TYPES = ['single', 'multiple', 'text'];
 const REVEAL_MODES = ['anytime', 'after_answering']; // first one is the default
 
+// Supabase settings in course.yml. The URL must be a supabase.co project URL,
+// because the deploy workflow sends the secret key there.
+const SUPABASE_URL_PATTERN = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+const PUBLISHABLE_KEY_PATTERN = /^sb_publishable_[A-Za-z0-9_-]{10,}$/;
+const GITHUB_LOGIN_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
+
 // Heading levels: a "# Heading" in a file becomes <h3> under a section <h2>,
 // and <h4> inside a card whose title is <h3>.
 const UNDER_SECTION = 2;
@@ -37,10 +44,8 @@ class Problems {
   rel(file) {
     return path.relative(this.root, file) || path.basename(file);
   }
-  // Messages quote values from content files. Newlines are escaped so a value
-  // can't start a new log line (GitHub Actions runs lines starting with "::").
   format(file, message) {
-    return `${this.rel(file)}: ${message}`.replace(/[\r\n\u2028\u2029]/g, (c) => JSON.stringify(c).slice(1, -1));
+    return safeLogText(`${this.rel(file)}: ${message}`);
   }
   error(file, message) {
     const text = this.format(file, message);
@@ -50,6 +55,18 @@ class Problems {
     const text = this.format(file, message);
     if (!this.warnings.includes(text)) this.warnings.push(text);
   }
+}
+
+/**
+ * Make text that quotes content (or a server's reply) safe to print in a
+ * GitHub Actions log: newlines are escaped, so a value can't start a new line
+ * (the runner obeys lines starting with "::"), and "##[" is broken up (the
+ * runner's older command syntax works anywhere in a line).
+ */
+export function safeLogText(text) {
+  return String(text)
+    .replace(/[\r\n\u2028\u2029]/g, (c) => JSON.stringify(c).slice(1, -1))
+    .replaceAll('##[', '# #[');
 }
 
 /** File type at `file` without following symlinks, or null if missing. */
@@ -64,6 +81,24 @@ async function kindOf(file) {
   }
 }
 
+/**
+ * Does `text` contain a Supabase secret key? Checks for new secret keys
+ * (sb_secret_...) and old-style service_role keys (JWTs with role
+ * "service_role"). Returns a short description, never the key itself.
+ */
+export function findSecretKey(text) {
+  if (/sb_secret_[A-Za-z0-9_-]{8,}/.test(text)) return 'a Supabase secret key (sb_secret_...)';
+  for (const [, payload] of text.matchAll(/eyJ[A-Za-z0-9_-]{5,}\.(eyJ[A-Za-z0-9_-]{5,})\.[A-Za-z0-9_-]+/g)) {
+    try {
+      const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+      if (claims?.role === 'service_role') return 'a Supabase service_role key';
+    } catch {
+      // not a JWT after all
+    }
+  }
+  return null;
+}
+
 /** Read a text file. Symbolic links are refused so nothing outside the content folder is published. */
 async function readText(file, problems) {
   const kind = await kindOf(file);
@@ -72,7 +107,65 @@ async function readText(file, problems) {
     problems.error(file, kind === 'symlink' ? 'symbolic links are not allowed in content' : 'expected a file');
     return null;
   }
-  return readFile(file, 'utf8');
+  const text = await readFile(file, 'utf8');
+  if (reportSecretKey(text, file, problems)) return null;
+  return text;
+}
+
+/**
+ * The texts in an attachment to check for keys, one at a time: the raw bytes,
+ * UTF-16 text (e.g. Excel's "Unicode Text"), and the compressed streams of a
+ * PDF, where most PDF writers keep the page text (with kerned text pieces
+ * joined). Images and PDF text drawn with embedded-font codes can't be checked.
+ * Calls onLimit() and stops if a PDF inflates to more than `budget` bytes.
+ */
+export function* attachmentTexts(bytes, extension, { budget = 256 * 1024 * 1024, onLimit = () => {} } = {}) {
+  const raw = bytes.toString('latin1');
+  yield raw;
+  const bom = bytes.subarray(0, 2).toString('hex');
+  let nulOdd = 0;
+  for (let i = 1; i < Math.min(bytes.length, 4096); i += 2) if (bytes[i] === 0) nulOdd += 1;
+  const even = bytes.subarray(0, bytes.length - (bytes.length % 2));
+  if (bom === 'fffe' || nulOdd > 64) yield even.toString('utf16le');
+  if (bom === 'feff') yield Buffer.from(even).swap16().toString('utf16le');
+  if (extension !== '.pdf') return;
+  // "stream" right after a non-letter, so "endstream" or "upstream" don't count.
+  const marker = /(?<![A-Za-z])stream\r?\n/g;
+  let used = 0;
+  for (let m = marker.exec(raw); m; m = marker.exec(raw)) {
+    const start = m.index + m[0].length;
+    const end = raw.indexOf('endstream', start);
+    if (end < 0) return;
+    marker.lastIndex = end + 'endstream'.length;
+    let text;
+    try {
+      text = inflateSync(bytes.subarray(start, end), { maxOutputLength: 64 * 1024 * 1024 }).toString('latin1');
+    } catch {
+      continue; // not a Flate stream (or too large): nothing to read
+    }
+    used += text.length;
+    if (used > budget) {
+      onLimit();
+      return;
+    }
+    yield text;
+    // Kerned text is written as [(sb) -0.2 (_se) -0.2 (cret)] TJ: join the pieces.
+    if (text.includes('TJ')) yield text.replace(/\)\s*-?(?:\d+\.?\d*|\.\d+)\s*\(/g, '');
+  }
+}
+
+/** Report a secret key in `texts` (a string or an iterable of strings; never the key itself). Returns true if one was found. */
+function reportSecretKey(texts, file, problems) {
+  let secret = null;
+  for (const text of typeof texts === 'string' ? [texts] : texts) {
+    secret = findSecretKey(text);
+    if (secret) break;
+  }
+  if (!secret) return false;
+  problems.error(file, `contains ${secret}. Secret keys must never be in content files or attachments, `
+    + 'because the repository and the website are public. Remove it. If it was ever committed or pushed, '
+    + 'also delete that key in Supabase (Settings → API Keys) and create a new one.');
+  return true;
 }
 
 /** undefined = file missing, null = file broken (already reported), otherwise the parsed value. */
@@ -160,19 +253,82 @@ function checker(problems, file, where) {
 }
 
 const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [] };
+const NO_COURSE = { course: DEFAULT_COURSE, backend: null, members: [] };
+
+/** The optional `backend:` section: where sign-in and survey answers live. */
+function loadBackend(raw, file, problems) {
+  if (raw === undefined || raw === null) return null;
+  if (!isObject(raw)) {
+    problems.error(file, '"backend" must be a mapping with url, publishable_key and course_id');
+    return null;
+  }
+  const c = checker(problems, file, 'backend');
+  c.keys(raw, ['url', 'publishable_key', 'course_id']);
+  const url = c.string(
+    { url: typeof raw.url === 'string' ? raw.url.trim().replace(/\/+$/, '') : raw.url }, 'url',
+    { required: true, pattern: SUPABASE_URL_PATTERN, patternHint: 'must be the Supabase Project URL, like https://abcdefghijklmnopqrst.supabase.co' },
+  );
+  // Checked by hand, so a wrong key is never repeated in the error message.
+  let key = raw.publishable_key;
+  if (key === undefined || key === null || key === '') {
+    problems.error(file, '"backend.publishable_key" is required');
+    key = undefined;
+  } else if (typeof key !== 'string' || !PUBLISHABLE_KEY_PATTERN.test(key)) {
+    if (typeof key !== 'string' || !findSecretKey(key)) { // secret keys are already reported
+      problems.error(file, '"backend.publishable_key" must be the publishable key, which starts with sb_publishable_ '
+        + '(Supabase dashboard: Settings → API Keys)');
+    }
+    key = undefined;
+  }
+  const courseId = c.string(raw, 'course_id', { required: true, pattern: ID_PATTERN, patternHint: ID_HINT });
+  return url && key && courseId ? { url, publishable_key: key, course_id: courseId } : null;
+}
+
+/** The optional `members:` list: GitHub usernames allowed to sign in. */
+function loadMembers(list, file, problems) {
+  const seen = new Set();
+  return list.map((entry, i) => {
+    if (typeof entry === 'number' || typeof entry === 'boolean' || entry === null) {
+      // YAML reads 0123, 1e3, true or null as values, not names: a different account.
+      problems.error(file, `members[${i}] must be in quotes, because YAML reads it as a number or a special value `
+        + '(write it like - "0123")');
+      return null;
+    }
+    const name = typeof entry === 'string' ? entry.trim().replace(/^@/, '') : entry;
+    if (typeof name !== 'string' || !GITHUB_LOGIN_PATTERN.test(name)) {
+      problems.error(file, `members[${i}] must be a GitHub username, like "octocat"`);
+      return null;
+    }
+    if (seen.has(name.toLowerCase())) {
+      problems.error(file, `members: "${name}" is listed twice`);
+      return null;
+    }
+    seen.add(name.toLowerCase());
+    return name;
+  }).filter(Boolean);
+}
 
 function loadCourse(raw, file, problems) {
   if (raw === undefined) {
     problems.error(file, 'missing course.yml');
-    return DEFAULT_COURSE;
+    return NO_COURSE;
   }
-  if (raw === null) return DEFAULT_COURSE; // already reported
+  if (raw === null) return NO_COURSE; // already reported
   if (!isObject(raw)) {
     problems.error(file, 'course.yml must be a mapping (key: value pairs)');
-    return DEFAULT_COURSE;
+    return NO_COURSE;
   }
   const c = checker(problems, file, '');
-  c.keys(raw, ['name', 'description', 'links']);
+  c.keys(raw, ['name', 'description', 'links', 'backend', 'members']);
+  const backend = loadBackend(raw.backend, file, problems);
+  const memberList = c.list(raw, 'members');
+  const members = loadMembers(memberList, file, problems);
+  if (raw.backend && !memberList.length) {
+    problems.warn(file, 'nobody can sign in yet: add the team\'s GitHub usernames under "members"');
+  }
+  if (!raw.backend && members.length) {
+    problems.warn(file, '"members" has no effect without a "backend" section');
+  }
   const md = createMarkdown();
   const links = c.list(raw, 'links').map((link, i) => {
     if (!isObject(link)) {
@@ -192,9 +348,13 @@ function loadCourse(raw, file, problems) {
   const descriptionHtml = md.block(c.string(raw, 'description'), { headingOffset: 1, source: 'course.yml' });
   for (const { href } of md.fileLinks) problems.error(file, `description links to "${href}"; use a full https:// address`);
   return {
-    name: c.string(raw, 'name', { required: true }) ?? DEFAULT_COURSE.name,
-    description_html: descriptionHtml,
-    links,
+    course: {
+      name: c.string(raw, 'name', { required: true }) ?? DEFAULT_COURSE.name,
+      description_html: descriptionHtml,
+      links,
+    },
+    backend,
+    members,
   };
 }
 
@@ -334,7 +494,11 @@ async function scanMeetingFolder(dir, problems, base = '') {
     } else if (!base && MEETING_FILES.includes(entry.name.toLowerCase())) {
       problems.error(full, `rename to ${entry.name.toLowerCase()} (file names are case-sensitive on the server)`);
     } else if (ASSET_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-      assets.push(rel);
+      // Attachments are published as they are, so check them for keys too.
+      const texts = attachmentTexts(await readFile(full), path.extname(entry.name).toLowerCase(), {
+        onLimit: () => problems.warn(full, 'is too large to check completely for secret keys'),
+      });
+      if (!reportSecretKey(texts, full, problems)) assets.push(rel);
     } else {
       problems.warn(full, `is not published (known files: ${MEETING_FILES.join(', ')}; attachments: ${[...ASSET_EXTENSIONS].join(' ')})`);
     }
@@ -426,7 +590,7 @@ export async function loadContent(contentDir, { engineVersion = '0.0.0' } = {}) 
   const root = path.resolve(contentDir);
   const problems = new Problems(root);
   const courseFile = path.join(root, 'course.yml');
-  const course = loadCourse(await readYaml(courseFile, problems), courseFile, problems);
+  const { course, backend, members } = loadCourse(await readYaml(courseFile, problems), courseFile, problems);
 
   const meetingsDir = path.join(root, 'meetings');
   const meetings = [];
@@ -461,7 +625,10 @@ export async function loadContent(contentDir, { engineVersion = '0.0.0' } = {}) 
   meetings.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 
   return {
-    site: { engine: { version: engineVersion }, course, meetings },
+    // site becomes data/site.json (public). The member list is not in it:
+    // the website doesn't need it, and the deploy workflow sends it to the backend.
+    site: { engine: { version: engineVersion }, course, backend, meetings },
+    members,
     errors: problems.errors,
     warnings: problems.warnings,
     assets,

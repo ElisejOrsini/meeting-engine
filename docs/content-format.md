@@ -55,7 +55,20 @@ description: |                    # optional, Markdown, shown on the start page
 links:                            # optional, shown on the start page
   - title: Course website         # required
     url: https://example.org      # required, https://, http:// or mailto:
+
+backend:                          # optional: GitHub sign-in (and later survey answers)
+  url: https://abcdefghijklmnopqrst.supabase.co   # required, the Supabase Project URL
+  publishable_key: sb_publishable_...             # required, the publishable key (public)
+  course_id: applied-widgetry-2026                # required, an id; unique per course in the project
+members:                          # GitHub usernames allowed to sign in
+  - ElisejOrsini
 ```
+
+`backend` and `members` are explained, with the one-time Supabase setup, in
+[backend-setup.md](backend-setup.md). Never put a secret key (`sb_secret_…`)
+in any content file: the check refuses it, because the repository and the site
+are public. The member list is not published on the site, but anyone who can
+see the repository can read it.
 
 ## meeting.yml
 

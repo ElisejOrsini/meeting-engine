@@ -6,3 +6,16 @@ description: |
 links:
   - title: Engine source on GitHub
     url: https://github.com/ElisejOrsini/meeting-engine
+
+# Sign-in and (later) survey answers. Both values are public by design: the
+# publishable key only allows what the database rules allow. Never put the
+# secret key (sb_secret_...) here; it belongs in a GitHub environment secret.
+backend:
+  url: https://pgupsbgknzxrbkgreoqm.supabase.co
+  publishable_key: sb_publishable_ybDals7fW8OzpAxH58DMiQ_WSVrPh5K
+  course_id: demo
+
+# GitHub usernames of the team. Only they can sign in. The deploy workflow
+# copies this list to the backend on every push.
+members:
+  - ElisejOrsini

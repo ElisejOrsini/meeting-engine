@@ -3,10 +3,13 @@
 # Course repositories use it in their deploy workflow; the full workflow is
 # in README.md ("Using the engine in a course repository"). The key line is:
 #
-#   - uses: ElisejOrsini/meeting-engine@v0.1.0
+#   - uses: ElisejOrsini/meeting-engine@v0.2.0
 #
 # The version after "@" pins the engine. GitHub downloads the engine at exactly
 # that version, so updating a course means changing that one tag.
+#
+# This action only builds; it needs no secrets. Sites with sign-in also run
+# ElisejOrsini/meeting-engine/sync@<version> in their deploy job (sync/action.yml).
 
 name: Meeting Engine
 description: Build a static meeting website (pre-meeting, in-meeting, post-meeting, decisions) from Markdown and YAML files.

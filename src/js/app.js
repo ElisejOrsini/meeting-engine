@@ -5,8 +5,11 @@
 //   #/m/<meeting-id>           a meeting (picks a sensible tab)
 //   #/m/<meeting-id>/<tab>     tab = pre | during | post   (?focus=<question-id>)
 //   #/decisions?q=<search>     all decisions, searchable
+//
+// Sign-in (only with a backend in course.yml) lives in auth.js.
 
 import { html } from './dom.js';
+import { startAuth, takeAuthRedirect } from './auth.js';
 import {
   TABS, defaultTab, meetingsView, meetingView, decisionsView, decisionCount, decisionList,
   allDecisions, filterDecisions, notFoundView, errorView,
@@ -95,6 +98,8 @@ function wireDecisionSearch() {
 }
 
 async function start() {
+  // Back from GitHub sign-in? Restore the page first, so it is what gets drawn.
+  const redirect = takeAuthRedirect();
   // The skip link targets #main, which would otherwise be read as a route.
   document.querySelector('[data-skip]')?.addEventListener('click', (event) => {
     event.preventDefault();
@@ -112,6 +117,12 @@ async function start() {
   footer.innerHTML = String(html`Built with <a href="https://github.com/ElisejOrsini/meeting-engine" rel="noopener">meeting-engine</a> v${site.engine.version}`);
   window.addEventListener('hashchange', route);
   route();
+  if (site.backend) {
+    await startAuth(site.backend, redirect, {
+      accountEl: document.getElementById('account'),
+      noticeEl: document.getElementById('site-notice'),
+    });
+  }
 }
 
 start();

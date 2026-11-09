@@ -1,0 +1,57 @@
+# meeting-engine: copy the team list to the backend.
+#
+# For course sites with sign-in (a backend: section in course.yml). Run it in
+# the deploy job, which uses the github-pages environment and has the
+# permission "actions: read". Before using the secret key, the sync checks that
+# github-pages only runs for the branch being deployed, so workflows on other
+# branches can't read the key. The full workflow is in docs/backend-setup.md.
+#
+#   - uses: ElisejOrsini/meeting-engine/sync@v0.2.0
+#     with:
+#       supabase-url: https://abcdefghijklmnopqrst.supabase.co
+#       supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+name: Meeting Engine team list sync
+description: Copy the team list (members in course.yml) of a meeting-engine site to its Supabase backend.
+author: ElisejOrsini
+branding:
+  icon: users
+  color: blue
+
+inputs:
+  content-dir:
+    description: Folder that contains course.yml (relative to the repository root).
+    required: false
+    default: "."
+  supabase-url:
+    description: >-
+      The Supabase Project URL. The secret key is only ever sent to this
+      address, and course.yml's backend.url must be the same.
+    required: true
+  supabase-secret-key:
+    description: >-
+      Secret key of the Supabase project, passed from the environment secret
+      SUPABASE_SECRET_KEY. Never write the key itself into a file.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    # The engine is the folder above this one.
+    - name: Install engine dependencies
+      shell: bash
+      run: cd "$GITHUB_ACTION_PATH/.." && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+    - name: Copy team list to the backend
+      shell: bash
+      env:
+        CONTENT_DIR: ${{ inputs.content-dir }}
+        SUPABASE_URL: ${{ inputs.supabase-url }}
+        SUPABASE_SECRET_KEY: ${{ inputs.supabase-secret-key }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: node "$GITHUB_ACTION_PATH/../build/backend.mjs" sync --content "$CONTENT_DIR"

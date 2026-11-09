@@ -40,6 +40,28 @@ const quietLog = { log: () => {}, warn: console.warn, error: console.error };
 
 const ALLOWED_HOSTS = new Set([`localhost:${values.port}`, `127.0.0.1:${values.port}`]);
 
+// Requests that arrive while a build is running share it (two builds at once
+// would delete each other's output).
+let running = null;
+function rebuild() {
+  running ??= (async () => {
+    const errors = [];
+    try {
+      const result = await build({
+        contentDir: values.content,
+        outDir: OUT,
+        log: { ...quietLog, error: (m) => errors.push(m) },
+      });
+      return { ok: result.ok, errors };
+    } catch (err) {
+      return { ok: false, errors: [String(err?.stack ?? err)] };
+    } finally {
+      running = null;
+    }
+  })();
+  return running;
+}
+
 const server = createServer(async (req, res) => {
   // Only answer requests for this machine (protects against DNS rebinding).
   if (!ALLOWED_HOSTS.has(req.headers.host)) {
@@ -56,13 +78,8 @@ const server = createServer(async (req, res) => {
   if (pathname.endsWith('/')) pathname += 'index.html';
 
   if (pathname === '/index.html') {
-    const errors = [];
-    const result = await build({
-      contentDir: values.content,
-      outDir: OUT,
-      log: { ...quietLog, error: (m) => errors.push(m) },
-    });
-    if (!result.ok) {
+    const { ok, errors } = await rebuild();
+    if (!ok) {
       res.writeHead(500, { 'content-type': TYPES['.html'] });
       res.end(`<!doctype html><meta charset="utf-8"><title>Build failed</title><h1>Build failed</h1><pre>${escapeHtml(errors.join('\n'))}</pre>`);
       return;
