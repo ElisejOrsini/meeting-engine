@@ -12,7 +12,7 @@
     "build": "node build/build.mjs --content demo --out _site",
     "check": "node build/build.mjs --content demo --check",
     "dev": "node scripts/dev-server.mjs --content demo",
-    "test": "node --test test/"
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "js-yaml": "5.5.0",
