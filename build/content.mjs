@@ -43,10 +43,12 @@ class Problems {
     return `${this.rel(file)}: ${message}`.replace(/[\r\n\u2028\u2029]/g, (c) => JSON.stringify(c).slice(1, -1));
   }
   error(file, message) {
-    this.errors.push(this.format(file, message));
+    const text = this.format(file, message);
+    if (!this.errors.includes(text)) this.errors.push(text);
   }
   warn(file, message) {
-    this.warnings.push(this.format(file, message));
+    const text = this.format(file, message);
+    if (!this.warnings.includes(text)) this.warnings.push(text);
   }
 }
 

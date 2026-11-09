@@ -250,3 +250,20 @@ test('content: values with newlines cannot start new log lines', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('build: refuses an output path that is an existing file', async () => {
+  const { build } = await import('../build/build.mjs');
+  const dir = await fixture({
+    'content/course.yml': 'name: T\n',
+    'content/meetings/m/meeting.yml': 'title: M\ndate: 2026-03-03\n',
+    'notes.txt': 'keep me',
+  });
+  try {
+    const result = await build({ contentDir: path.join(dir, 'content'), outDir: path.join(dir, 'notes.txt'), log: { log() {}, warn() {}, error() {} } });
+    assert.equal(result.ok, false);
+    const { readFile } = await import('node:fs/promises');
+    assert.equal(await readFile(path.join(dir, 'notes.txt'), 'utf8'), 'keep me');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

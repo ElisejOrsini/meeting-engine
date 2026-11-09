@@ -127,7 +127,8 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
   from meeting transcripts. Raw HTML in Markdown is shown as text. Links may only
   be `https:`, `mailto:`, site pages or attachments. Images must be attachments
   (images from other websites could track viewers, so they become links). The
-  page sets a Content Security Policy that only allows its own scripts and images.
+  page sets a Content Security Policy that only allows scripts and images from
+  its own origin (see the next point about what "origin" means on GitHub Pages).
 - The build refuses symbolic links in content, and it only deletes an output
   folder it created itself.
 - Meeting transcripts can contain personal data and must not be committed to a

@@ -7,7 +7,7 @@
 // <folder> contains course.yml and meetings/. See docs/content-format.md.
 
 import { realpathSync } from 'node:fs';
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -49,12 +49,15 @@ async function checkOutputFolder(out, contentDir) {
   for (const protectedDir of [contentDir, ENGINE_ROOT, process.cwd()].map(realPath)) {
     if (isInside(realOut, protectedDir)) return `it contains ${protectedDir}`;
   }
-  let entries;
+  let info;
   try {
-    entries = await readdir(out);
-  } catch {
-    return null; // doesn't exist yet
+    info = await lstat(out);
+  } catch (err) {
+    if (err.code === 'ENOENT') return null; // doesn't exist yet
+    throw err;
   }
+  if (!info.isDirectory()) return 'it is a file or link, not a folder; choose a folder name for the website';
+  const entries = await readdir(out);
   if (entries.length && !entries.includes(OUTPUT_MARKER)) {
     return 'it already exists and was not created by this build (delete it yourself or pick another folder)';
   }
