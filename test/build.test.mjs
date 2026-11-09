@@ -267,3 +267,19 @@ test('build: refuses an output path that is an existing file', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('content: reveal mode defaults to anytime', async () => {
+  const dir = await fixture({
+    'course.yml': 'name: T\n',
+    'meetings/a/meeting.yml': 'title: A\ndate: 2026-03-03\n',
+    'meetings/b/meeting.yml': 'title: B\ndate: 2026-03-04\nresponses:\n  reveal: after_answering\n',
+  });
+  try {
+    const { site, errors } = await loadContent(dir);
+    assert.deepEqual(errors, []);
+    const byId = Object.fromEntries(site.meetings.map((m) => [m.id, m.reveal]));
+    assert.deepEqual(byId, { a: 'anytime', b: 'after_answering' });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

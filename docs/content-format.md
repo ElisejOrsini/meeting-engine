@@ -67,9 +67,11 @@ duration: 60                      # optional, whole minutes
 location: Room HG E 33 and online # optional
 
 responses:
-  reveal: after_answering         # after_answering (default) | anytime
-  # after_answering: others' survey answers unlock only after you submit your own
-  # anytime: others' answers are hidden behind a "Show other responses" button
+  reveal: anytime                 # anytime (default) | after_answering
+  # Answering is always optional. Others' answers start hidden in both modes.
+  # anytime: anyone on the team can click "Show other responses", answered or not
+  # after_answering: the button only works once you've submitted your own answer
+  #   (avoids anchoring; people who don't answer never see the others)
 
 agenda:                           # optional, shown on the In-meeting tab
   - title: Survey results on grace periods   # required

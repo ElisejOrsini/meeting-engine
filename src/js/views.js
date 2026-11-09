@@ -124,8 +124,8 @@ function surveyField(question, field, disabled) {
 
 function revealNote(meeting) {
   return meeting.reveal === 'after_answering'
-    ? 'Others’ answers become visible after you submit your own.'
-    : 'Others’ answers stay hidden until you choose to show them.';
+    ? 'Answering is optional. Others’ answers become visible once you’ve submitted your own.'
+    : 'Answering is optional. Others’ answers stay hidden until you click “Show other responses”.';
 }
 
 function questionCard(meeting, question, index) {

@@ -7,7 +7,7 @@ time: "14:00"
 duration: 60
 location: Room or link
 responses:
-  reveal: after_answering   # or: anytime
+  reveal: anytime   # or: after_answering (others' answers unlock only after you answer)
 
 agenda:
   - title: First agenda item

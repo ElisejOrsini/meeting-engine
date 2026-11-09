@@ -21,7 +21,7 @@ const ID_HINT = 'must be lowercase letters and digits, separated by single dashe
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const FIELD_TYPES = ['single', 'multiple', 'text'];
-const REVEAL_MODES = ['after_answering', 'anytime'];
+const REVEAL_MODES = ['anytime', 'after_answering']; // first one is the default
 
 // Heading levels: a "# Heading" in a file becomes <h3> under a section <h2>,
 // and <h4> inside a card whose title is <h3>.
@@ -371,7 +371,7 @@ async function loadMeeting(dir, id, problems) {
 
   const responses = c.object(raw, 'responses');
   checker(problems, file, 'responses').keys(responses, ['reveal']);
-  const reveal = responses.reveal ?? 'after_answering';
+  const reveal = responses.reveal ?? REVEAL_MODES[0];
   if (!REVEAL_MODES.includes(reveal)) {
     problems.error(file, `"responses.reveal" must be one of ${REVEAL_MODES.join(', ')} (got "${reveal}")`);
   }
@@ -396,7 +396,7 @@ async function loadMeeting(dir, id, problems) {
     time: c.string(raw, 'time', { pattern: TIME_PATTERN, patternHint: 'must look like "14:00" (24-hour clock, in quotes)' }),
     duration,
     location: c.string(raw, 'location'),
-    reveal: REVEAL_MODES.includes(reveal) ? reveal : 'after_answering',
+    reveal: REVEAL_MODES.includes(reveal) ? reveal : REVEAL_MODES[0],
     background_html: await text('background.md'),
     prereading_html: await text('prereading.md'),
     guide_html: await text('guide.md'),
