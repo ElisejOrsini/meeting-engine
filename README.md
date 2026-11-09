@@ -39,15 +39,19 @@ meeting-engine (this repo, public)          course repo (one per course)
 | # | Milestone | Status |
 |---|-----------|--------|
 | 1 | Static site: meetings from content files, three tabs, Decisions page, deployed to Pages | done |
-| 2 | Agent-friendly maintenance: transcript → summary + decisions via pull request | next |
-| 3 | Course repo template + README for creating a new course site | planned |
-| 4 | Backend + GitHub login + allowlist, enforced server-side | planned |
-| 5 | Survey answers with hidden responses and "Show other responses" | planned |
-| 6 | Live in-meeting notes | later, optional |
+| 2 | Course repo template + step-by-step guide; first real course site online | next |
+| 3 | Backend (Supabase) + GitHub login + allowlist, enforced server-side | planned |
+| 4 | Survey answers with hidden responses and "Show other responses" | planned |
+| 5 | Live in-meeting notes | later, optional |
+| 6 | Agent automation (e.g. an OpenClaw agent turning transcripts into summaries) | later, optional |
+
+Until milestone 6, meetings are maintained by hand, with help from Claude Code
+if you like: add a meeting folder, and after the meeting write `summary.md` and
+`decisions.yml`, then run the check and commit.
 
 ## Using the engine in a course repository
 
-Milestone 3 adds a ready-made course template and a step-by-step guide. Until
+Milestone 2 adds a ready-made course template and a step-by-step guide. Until
 then, this is the whole setup: a repository with `course.yml`, a `meetings/`
 folder and this workflow file at `.github/workflows/deploy.yml`:
 
@@ -134,7 +138,7 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 - Meeting transcripts can contain personal data and must not be committed to a
   public repository.
 - All project sites of one GitHub account or organization share one web origin
-  (`<name>.github.io`). Before login is added (Milestone 4), each course site
+  (`<name>.github.io`). Before login is added (Milestone 3), each course site
   needs its own origin (a custom domain, or an organization that hosts nothing
   else on Pages), so other Pages sites can't read the login session.
 
