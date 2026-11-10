@@ -1,7 +1,8 @@
 # meeting-engine as a GitHub Action.
 #
 # Course repositories use it in their deploy workflow; the full workflow is
-# in README.md ("Using the engine in a course repository"). The key line is:
+# templates/course/.github/workflows/deploy.yml (guide: docs/new-course.md).
+# The key line is:
 #
 #   - uses: ElisejOrsini/meeting-engine@v0.3.0
 #

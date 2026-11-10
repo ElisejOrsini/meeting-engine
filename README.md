@@ -149,11 +149,10 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
    (see docs/backend-setup.md, step 2). The demo deploys from `main` with the
    new code, so it fails until the database is ready.
 2. Make the change, run `npm test`, push to `main`, and check the demo site.
-3. Update `version` in `package.json`, commit, then create a tag and release,
-   e.g. `git tag v0.3.0 && git push origin v0.3.0`.
-4. Update the version in `templates/course/` (its workflow, README and
-   `course.yml` links; `npm test` checks this) and in the docs' snippets.
-5. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
+3. In one commit, update `version` in `package.json`, every version in
+   `templates/course/` (`npm test` checks them) and the docs' snippets. Push,
+   then tag it, e.g. `git tag v0.4.0 && git push origin v0.4.0`.
+4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
 
 ## License

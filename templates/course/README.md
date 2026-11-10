@@ -16,6 +16,10 @@ student or a TA beyond what you'd put on a public course page:
   for …") instead of pasting raw responses. Leave out names, e-mail
   addresses, student numbers, grades and quotes someone could be recognised by.
 - Never commit meeting recordings or transcripts.
+- Keep raw exports (survey results, feedback forms) outside this folder, or in
+  `private/`, which git ignores. Commit files by name and look at `git status`
+  first. If something private was pushed, a later commit doesn't remove it from
+  the history: delete or re-create the repository.
 - Never commit passwords or keys. The build refuses Supabase secret keys.
 - `members:` in `course.yml` lists the team's GitHub usernames, publicly.
 
@@ -66,12 +70,12 @@ node ~/Desktop/meeting-engine/build/build.mjs --content . --check
 ```
 
 ```bash
-node ~/Desktop/meeting-engine/scripts/dev-server.mjs --content .
+node ~/Desktop/meeting-engine/scripts/dev-server.mjs --content . --port 4330
 ```
 
-The second command previews the site at http://localhost:4321. The preview
-uses whatever engine version is checked out there, which can be newer than
-the one this site pins.
+The second command previews the site at http://localhost:4330 (check that the
+header shows this course's name). The preview uses whatever engine version is
+checked out there, which can be newer than the one this site pins.
 
 ## Engine version
 
@@ -79,6 +83,13 @@ the one this site pins.
 every `ElisejOrsini/meeting-engine…@` version in that file to the same new
 version and push. If the new version's release notes add a database file,
 run it in Supabase first.
+
+## One Pages site per organization
+
+Sign-in only stays private if this is the only Pages site of its GitHub
+organization (they all share `ORGANIZATION.github.io`). Don't publish any other
+Pages site from this organization; give each further course with sign-in its
+own organization or a custom domain.
 
 ## Sign-in and survey answers
 

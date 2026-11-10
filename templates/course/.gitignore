@@ -1,2 +1,5 @@
 _site/
 .DS_Store
+# Scratch space that is never committed, e.g. raw survey exports you are
+# summarising. (Safer still: keep such files outside this folder.)
+private/

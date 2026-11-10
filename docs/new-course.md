@@ -23,7 +23,16 @@ gh api orgs/ORGANIZATION/repos --paginate --jq '.[] | select(.has_pages) | .full
 ```
 
 No output means it publishes no Pages site. (You need to be a member who can
-see all its repositories.)
+see all its repositories.) This is a rule for the organization's whole life:
+it must not publish any other Pages site later either, so each further course
+with sign-in needs its own organization (or a custom domain).
+
+**No suitable organization yet?** Create one (it's free): on github.com, click
+your profile picture → **Your organizations** → **New organization** → **Free**.
+Organization name: e.g. `widgetry-tas-2026` (it becomes
+`widgetry-tas-2026.github.io`, so lowercase is best). "This organization
+belongs to": **My personal account**. Click **Next**, skip adding members for
+now, and finish. You are its owner.
 
 **Public or private.** On GitHub's free plan, an organization can only publish
 Pages from a **public** repository. Then the course repository is public, and
@@ -33,7 +42,11 @@ So before any content goes in, agree on what may be public:
 - Student feedback and survey results: summarised or counted, not raw. No
   names, e-mail addresses, student numbers, grades, or quotes someone could be
   recognised by. Keep raw responses somewhere private (e.g. the course's
-  internal drive) and link to that instead, if the team has access there.
+  internal drive) and, if useful, link to that location. Only link to places
+  that need the team's own login; never use an "anyone with the link" share,
+  because that link would be public too.
+- Keep raw files out of the repository folder (or in its `private/` folder,
+  which git ignores). Everything else in the folder gets committed.
 - No recordings or transcripts.
 - The team's GitHub usernames (`members:` in `course.yml`) are public.
 
@@ -77,20 +90,35 @@ git remote add origin https://github.com/ORGANIZATION/ta-meetings.git
    node ~/Desktop/meeting-engine/build/build.mjs --content . --check
    ```
 
-   and look at it locally (http://localhost:4321):
+   and look at it locally at http://localhost:4330 (the header must show your
+   course's name, not the demo's):
 
    ```bash
-   node ~/Desktop/meeting-engine/scripts/dev-server.mjs --content .
+   node ~/Desktop/meeting-engine/scripts/dev-server.mjs --content . --port 4330
    ```
 
 5. Read through everything once more with "this is public" in mind (step 0).
 
 ## 4. Publish (Claude Code)
 
+First list what would be committed, and check that only these files are
+there (nothing with raw data):
+
 ```bash
-git add -A && git commit -m "First version of the TA meeting site"
+git status --short --untracked-files=all
+```
+
+Then commit them by name and push:
+
+```bash
+git add .gitignore README.md course.yml .github meetings
+git commit -m "First version of the TA meeting site"
 git push -u origin main
 ```
+
+If something private was pushed by mistake, a later commit doesn't remove it
+from the public history: delete the repository (Settings → General → Danger
+Zone) and start this step again.
 
 Then on github.com: **Actions** → **Deploy site** should turn green in a
 couple of minutes. The address is under **Settings → Pages** ("Your site is
@@ -114,10 +142,11 @@ courses should create their own project there).
      `github-actions-ta-meetings`). Don't save it anywhere else.
 3. `.github/workflows/deploy.yml` **(Claude Code)**: set `supabase-url` to the
    Project URL.
-4. `course.yml` **(Claude Code)**: un-comment `backend:` and fill in `url`
-   (the same Project URL), `publishable_key`, and a new `course_id` (e.g.
-   `widgetry-2026`; never reuse another course's). Un-comment `members:` and
-   list the team's GitHub usernames.
+4. `course.yml` **(Claude Code)**: un-comment the lines from `backend:` to
+   the username, and replace every `REPLACE_...` value: `url` (the same
+   Project URL), `publishable_key`, a new `course_id` (e.g. `widgetry-2026`;
+   never reuse another course's), and the placeholder username with the
+   team's GitHub usernames (one per line).
 5. Push. The deploy's "Copy team list and survey settings" step lists the
    members it copied. Then sign in on the site to check.
 

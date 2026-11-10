@@ -59,7 +59,7 @@ jobs:
       - name: Copy team list and survey settings to the backend
         uses: ElisejOrsini/meeting-engine/sync@v0.3.0
         with:
-          supabase-url: https://abcdefghijklmnopqrst.supabase.co # your Project URL (same as in course.yml)
+          supabase-url: https://REPLACE-WITH-PROJECT-URL.supabase.co # your Project URL (same as in course.yml)
           supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
 
       - name: Publish to GitHub Pages

@@ -2,7 +2,7 @@
 // Run with: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, readFile, readdir } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,18 @@ test('templates: the course template builds, and its meeting template is valid o
   assert.deepEqual(result.warnings, []);
   assert.equal(result.site.backend, null, 'sign-in starts switched off');
 
+  // Switching sign-in on without replacing the placeholders fails the check.
+  const raw = await readFile(path.join(TEMPLATE, 'course.yml'), 'utf8');
+  const start = raw.indexOf('# backend:');
+  const enabled = raw.slice(0, start) + raw.slice(start).replace(/^# /gm, '');
+  const tmp = await mkdtemp(path.join(tmpdir(), 'meeting-engine-template-on-'));
+  await cp(TEMPLATE, tmp, { recursive: true });
+  await writeFile(path.join(tmp, 'course.yml'), enabled);
+  const problems = (await loadContent(tmp)).errors.join('\n');
+  for (const key of ['backend.url', 'publishable_key', 'backend.course_id', 'members[0]']) {
+    assert.ok(problems.includes(key), `placeholder ${key} must be refused:\n${problems}`);
+  }
+
   const dir = await mkdtemp(path.join(tmpdir(), 'meeting-engine-template-'));
   await cp(TEMPLATE, dir, { recursive: true });
   const meeting = path.join(dir, 'meetings', '2026-01-31-first');
@@ -46,8 +58,9 @@ test('templates: every engine version in the template is the current one', async
   const found = [];
   for (const file of await filesIn(TEMPLATE)) {
     const text = await readFile(file, 'utf8');
-    for (const m of text.matchAll(/ElisejOrsini\/meeting-engine(?:\/[a-z]+)?@(v[\w.-]+)|meeting-engine\/blob\/(v[\w.-]+)\//g)) {
-      found.push({ file: path.relative(ROOT, file), version: m[1] ?? m[2] });
+    // Any version number at all (pins, doc links, comments).
+    for (const m of text.matchAll(/\bv\d+\.\d+\.\d+\b/g)) {
+      found.push({ file: path.relative(ROOT, file), version: m[0] });
     }
   }
   assert.ok(found.length >= 3, 'the template pins the engine');
