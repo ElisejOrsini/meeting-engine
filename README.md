@@ -52,7 +52,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 | 1 | Static site: meetings from content files, three tabs, Decisions page, deployed to Pages | done |
 | 2 | Backend (Supabase) + GitHub login + allowlist, enforced server-side; tried on the demo site | done (v0.2.0) |
 | 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering; names or anonymous; deleted after 30 days) | done (v0.3.0) |
-| 4 | Course template (in this repo) + step-by-step guide; first real course site online | next |
+| 4 | Course template (in this repo) + step-by-step guide; first real course site online | in progress |
 | 5 | Live in-meeting notes | later, optional |
 | 6 | Agent automation (e.g. an OpenClaw agent turning transcripts into summaries) | later, optional |
 
@@ -62,55 +62,11 @@ if you like: add a meeting folder, and after the meeting write `summary.md` and
 
 ## Using the engine in a course repository
 
-Milestone 4 adds a ready-made course template and a step-by-step guide. Until
-then, this is the whole setup: a repository with `course.yml`, a `meetings/`
-folder and this workflow file at `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy site
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-permissions:
-  contents: read
-concurrency:
-  group: pages
-  cancel-in-progress: false
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine@v0.3.0   # the engine version
-        with:
-          content-dir: .
-          out-dir: _site
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: _site
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
-```
-
-Then, once, in the course repository on github.com: **Settings → Pages →
-Build and deployment → Source: GitHub Actions**.
-
-For sign-in, the `deploy` job also runs the engine's sync action, with the
-secret key from the `github-pages` environment; see
-[docs/backend-setup.md](docs/backend-setup.md), step 7.
+A new course starts from the template in [`templates/course/`](templates/course):
+`course.yml`, a meeting template, the deploy workflow (pinned to the newest
+engine version) and a README for the course team. The step-by-step guide is
+[docs/new-course.md](docs/new-course.md): where the site can live, what may be
+public, creating the repository, the first meeting, and sign-in.
 
 ## Working on the engine locally
 
@@ -137,8 +93,10 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 | `supabase/migrations/` | Database setup, pasted into the Supabase SQL Editor ([guide](docs/backend-setup.md)) |
 | `src/` | The website (plain HTML, CSS and JavaScript, no framework) |
 | `demo/` | Made-up example course, published as this repo's own Pages site |
+| `templates/course/` | Starting point for a new course repository ([guide](docs/new-course.md)) |
 | `docs/content-format.md` | Reference for every content file and option |
 | `docs/backend-setup.md` | Sign-in setup, click by click |
+| `docs/new-course.md` | Setting up a new course site, click by click |
 | `test/` | Tests (`npm test`) |
 | `scripts/dev-server.mjs` | Local preview server |
 | `scripts/mock-supabase.js` | Pretend backend for `npm run dev:mock` (never used on real sites) |
@@ -193,7 +151,9 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 2. Make the change, run `npm test`, push to `main`, and check the demo site.
 3. Update `version` in `package.json`, commit, then create a tag and release,
    e.g. `git tag v0.3.0 && git push origin v0.3.0`.
-4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
+4. Update the version in `templates/course/` (its workflow, README and
+   `course.yml` links; `npm test` checks this) and in the docs' snippets.
+5. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
 
 ## License

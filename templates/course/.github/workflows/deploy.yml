@@ -1,0 +1,67 @@
+# Builds this course's meeting site with meeting-engine and publishes it on
+# GitHub Pages, on every push to main.
+#
+# Engine version: every "ElisejOrsini/meeting-engine...@v0.3.0" below must
+# have the same version. To get a newer engine (e.g. a new design), change
+# all of them and push.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build the site
+        uses: ElisejOrsini/meeting-engine@v0.3.0
+        with:
+          content-dir: .
+          out-dir: _site
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  # Only this job can use the SUPABASE_SECRET_KEY secret: it lives in the
+  # github-pages environment, which must only allow the main branch.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # lets the sync check the github-pages branch rule
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Copies the team list and survey settings to Supabase. Until course.yml
+      # has a backend: section, it only says "nothing to do".
+      - name: Copy team list and survey settings to the backend
+        uses: ElisejOrsini/meeting-engine/sync@v0.3.0
+        with:
+          supabase-url: https://abcdefghijklmnopqrst.supabase.co # your Project URL (same as in course.yml)
+          supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

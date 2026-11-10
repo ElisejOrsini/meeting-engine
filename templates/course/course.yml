@@ -1,0 +1,26 @@
+# Course settings. Every option is explained in the engine's docs:
+# https://github.com/ElisejOrsini/meeting-engine/blob/v0.3.0/docs/content-format.md
+#
+# This file, like everything in this repository, is public.
+
+name: "Course name"               # shown in the site header
+description: |
+  TA team meetings for Course name.
+
+# Links shown on the start page (optional):
+# links:
+#   - title: Course website
+#     url: https://example.org
+
+# Sign-in with GitHub and survey answers (optional). Set this up with
+# docs/backend-setup.md in the engine, then remove the "# " in front of the
+# lines below. Both values are public by design. Never put the secret key
+# (sb_secret_...) here: it belongs in the github-pages environment secret.
+# backend:
+#   url: https://abcdefghijklmnopqrst.supabase.co    # Project URL
+#   publishable_key: sb_publishable_...                # Settings → API Keys
+#   course_id: course-name-2026                        # unique per course site
+#
+# GitHub usernames of the TA team: only they can sign in and answer surveys.
+# members:
+#   - your-github-username
