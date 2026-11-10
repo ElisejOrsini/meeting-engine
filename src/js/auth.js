@@ -116,7 +116,7 @@ export async function startAuth(backend, redirect, { accountEl, noticeEl }) {
     if (status === 'loading') {
       accountEl.innerHTML = '';
     } else if (status === 'signed-out') {
-      accountEl.innerHTML = String(html`<button type="button" class="button" data-auth="sign-in" aria-label="Sign in with GitHub">Sign in<span class="wide-only"> with GitHub</span></button>`);
+      accountEl.innerHTML = String(html`<button type="button" class="button button-small" data-auth="sign-in" aria-label="Sign in with GitHub">Sign in<span class="wide-only"> with GitHub</span></button>`);
     } else if (status === 'unavailable') {
       accountEl.innerHTML = String(html`<span class="muted">Sign-in unavailable</span>`);
     } else {

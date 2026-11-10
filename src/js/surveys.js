@@ -1,8 +1,10 @@
 // Survey answers on the Pre-meeting tab.
 //
-// views.js draws each question's survey as a disabled form. attachSurveys()
-// brings those forms to life for signed-in team members: it fills in their
-// saved answers, saves changes, and shows the others' responses on request.
+// views.js draws each question's survey as a disabled form inside a sheet (a
+// modal <dialog>), opened from the question card, so the page reads without
+// it. attachSurveys() opens and closes the sheets and brings the forms to life
+// for signed-in team members: it fills in their saved answers, saves changes,
+// and shows the others' responses on request.
 // Every rule (who may answer, what an answer may contain, when others'
 // answers are visible, anonymity, deletion after 30 days) is enforced by the
 // database (supabase/migrations); this file only follows it.
@@ -154,12 +156,14 @@ export function attachSurveys(root, meeting, backend) {
   detachSurveys();
   const forms = [...root.querySelectorAll('form.survey[data-question]')];
   if (!forms.length) return;
-  const notice = root.querySelector('#survey-notice');
+  const notices = [...root.querySelectorAll('.survey-notice')];
   const questions = new Map(meeting.questions.map((q) => [q.id, q]));
   const expired = answersExpired(meeting.date);
   const stop = new AbortController();
   const others = (id) => root.querySelector(`.survey-others[data-question="${CSS.escape(id)}"]`);
   const formFor = (id) => forms.find((f) => f.dataset.question === id);
+  const sheetFor = (id) => root.querySelector(`dialog.sheet[data-question="${CSS.escape(id)}"]`);
+  const actionsFor = (id) => root.querySelector(`.question-actions[data-question="${CSS.escape(id)}"]`);
 
   let auth = { status: 'none' };
   let mine = new Map(); // question id -> { answer, updated_at }
@@ -174,7 +178,7 @@ export function attachSurveys(root, meeting, backend) {
     if (auth.status === 'none') return 'Answering surveys isn’t switched on for this site.';
     if (expired) return `The survey answers for this meeting were deleted ${KEEP_DAYS} days after it.`;
     switch (auth.status) {
-      case 'signed-out': return `Sign in with GitHub (top right) to answer. ${revealNote(meeting)}`;
+      case 'signed-out': return `Sign in with GitHub to answer. ${revealNote(meeting)}`;
       case 'not-member': return 'Your GitHub account isn’t on this course’s team list, so you can’t answer here.';
       case 'unavailable':
       case 'member-unknown': return 'Answering isn’t available right now (the backend didn’t answer). Please try again later.';
@@ -194,12 +198,24 @@ export function attachSurveys(root, meeting, backend) {
   }
 
   function render() {
-    // Only on change: the notice is a live region, and screen readers announce every update.
     const text = noticeText();
-    if (notice && notice.textContent !== text) notice.textContent = text;
+    for (const notice of notices) if (notice.textContent !== text) notice.textContent = text;
     const active = auth.status === 'member' && loaded && !expired;
     for (const form of forms) {
       const id = form.dataset.question;
+      // The question card: status and the buttons that open the sheet.
+      const card = actionsFor(id);
+      if (card) {
+        const answered = active && mine.has(id);
+        const status = card.querySelector('.question-status');
+        status.textContent = answered ? 'Answered' : '';
+        status.classList.toggle('is-answered', answered);
+        const canAnswer = !expired && ['member', 'signed-out', 'loading'].includes(auth.status);
+        card.querySelector('[data-action="open"]').textContent = answered ? 'Edit answer' : canAnswer ? 'Answer' : 'View survey';
+        card.querySelector('[data-action="open-responses"]').hidden = !active || (meeting.reveal === 'after_answering' && !mine.has(id));
+      }
+      const signIn = sheetFor(id)?.querySelector('.sheet-sign-in');
+      if (signIn) signIn.hidden = auth.status !== 'signed-out' || expired;
       for (const input of form.querySelectorAll('input, textarea')) input.disabled = !active;
       form.querySelector('.survey-actions').hidden = !active;
       form.querySelector('[data-action="clear"]').hidden = !mine.has(id);
@@ -352,13 +368,44 @@ export function attachSurveys(root, meeting, backend) {
     }
   }, { signal: stop.signal });
 
+  function openSheet(id, { responses = false } = {}) {
+    const sheet = sheetFor(id);
+    if (!sheet || sheet.open) return;
+    sheet.showModal();
+    // Focus the title, not a field: no keyboard popping up on phones, and
+    // screen readers announce which question this is.
+    sheet.querySelector('.sheet-title')?.focus();
+    if (responses && auth.status === 'member' && loaded) showOthers(id, { focus: true });
+  }
+
+  // A click on the dimmed backdrop closes the sheet, but only if the press
+  // started there too (not when selecting text in the sheet and releasing outside).
+  let pressedBackdrop = null;
+  root.addEventListener('pointerdown', (event) => {
+    pressedBackdrop = event.target.matches?.('dialog.sheet') ? event.target : null;
+  }, { signal: stop.signal });
+
   root.addEventListener('click', (event) => {
+    if (event.target.matches?.('dialog.sheet')) {
+      if (pressedBackdrop === event.target) event.target.close();
+      return;
+    }
     const button = event.target.closest('[data-action]');
-    if (!button || auth.status !== 'member' || !loaded) return;
+    if (!button) return;
     const id = button.closest('[data-question]')?.dataset.question;
     if (!id || !questions.has(id)) return;
-    if (button.dataset.action === 'clear') save(formFor(id), {});
-    if (button.dataset.action === 'show') showOthers(id, { focus: true });
+    const action = button.dataset.action;
+    if (action === 'open') return openSheet(id);
+    if (action === 'open-responses') return openSheet(id, { responses: true });
+    if (action === 'close') return sheetFor(id)?.close();
+    if (action === 'sign-in') {
+      sheetFor(id)?.close();
+      document.querySelector('[data-auth="sign-in"]')?.click();
+      return;
+    }
+    if (auth.status !== 'member' || !loaded) return;
+    if (action === 'clear') save(formFor(id), {});
+    if (action === 'show') showOthers(id, { focus: true });
   }, { signal: stop.signal });
 
   const unsubscribe = onAuth((state) => {

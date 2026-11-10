@@ -67,20 +67,24 @@ function section(title, content, { className = '' } = {}) {
 
 // ---------- meetings list ----------
 
-function meetingCard(meeting, today) {
+// One row of a grouped list: title, date line, status on the right, chevron.
+function meetingRow(meeting, today) {
   const surveyCount = meeting.questions.filter((q) => q.survey.length).length;
-  const badges = [];
-  if (meeting.date === today) badges.push(html`<span class="badge badge-today">Today</span>`);
-  if (meeting.date > today && surveyCount) badges.push(html`<span class="badge">${plural(surveyCount, 'survey question')}</span>`);
-  if (meeting.decisions.length) badges.push(html`<span class="badge badge-ok">${plural(meeting.decisions.length, 'decision')}</span>`);
-  if (meeting.date < today && !meeting.summary_html) badges.push(html`<span class="badge badge-warn">Summary pending</span>`);
+  const status = [];
+  if (meeting.date === today) status.push(html`<span class="badge badge-today">Today</span>`);
+  if (meeting.date > today && surveyCount) status.push(html`<span>${plural(surveyCount, 'survey question')}</span>`);
+  if (meeting.decisions.length) status.push(html`<span class="status-ok">${plural(meeting.decisions.length, 'decision')}</span>`);
+  if (meeting.date < today && !meeting.summary_html) status.push(html`<span class="status-warn">Summary pending</span>`);
   return html`
-    <li class="card meeting-card">
-      <a class="card-link" href="${link('m', meeting.id)}">
-        <span class="card-date">${formatDate(meeting.date)}${meeting.time ? ` · ${meeting.time}` : ''}</span>
-        <span class="card-title">${meeting.title}</span>
+    <li>
+      <a class="row-link" href="${link('m', meeting.id)}">
+        <span class="row-text">
+          <span class="row-title">${meeting.title}</span>
+          <span class="row-subtitle">${formatDate(meeting.date)}${meeting.time ? ` · ${meeting.time}` : ''}</span>
+        </span>
+        ${status.length ? html`<span class="row-meta">${status}</span>` : ''}
+        <span class="chevron" aria-hidden="true"></span>
       </a>
-      ${badges.length ? html`<div class="badges">${badges}</div>` : ''}
     </li>`;
 }
 
@@ -88,7 +92,7 @@ export function meetingsView(site, today = localToday()) {
   const upcoming = site.meetings.filter((m) => m.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   const past = site.meetings.filter((m) => m.date < today); // already newest first
   const list = (items, empty) => (items.length
-    ? html`<ul class="cards">${items.map((m) => meetingCard(m, today))}</ul>`
+    ? html`<ul class="list">${items.map((m) => meetingRow(m, today))}</ul>`
     : html`<p class="muted">${empty}</p>`);
   return {
     title: 'Meetings',
@@ -117,8 +121,9 @@ function surveyField(question, field, disabled) {
   return html`
     <fieldset class="field">
       <legend>${field.label}${req}${field.type === 'multiple' ? html` <span class="muted">(choose any)</span>` : ''}</legend>
-      ${field.options.map((option, i) => html`
+      <div class="options">${field.options.map((option, i) => html`
         <label class="option"><input type="${type}" name="${name}" value="${i}" data-field="${field.id}" ${disabled ? 'disabled' : ''}> <span>${option}</span></label>`)}
+      </div>
     </fieldset>`;
 }
 
@@ -130,16 +135,46 @@ export function revealNote(meeting) {
 
 function questionCard(meeting, question, index) {
   const decisions = meeting.decisions.filter((d) => d.question === question.id);
+  const id = question.id;
   return html`
-    <article class="card question" id="q-${question.id}" tabindex="-1">
+    <article class="card question" id="q-${id}" tabindex="-1">
       <header class="question-head">
-        <span class="question-num">Q${index + 1}</span>
-        <h3>${question.text}</h3>
+        <div class="question-title">
+          <p class="question-label">Question ${index + 1}</p>
+          <h3>${question.text}</h3>
+        </div>
         ${decisions.length ? html`<a class="badge badge-ok" href="${link('m', meeting.id, 'post')}">Decided</a>` : ''}
       </header>
       ${question.details_html ? html`<div class="prose">${raw(question.details_html)}</div>` : ''}
       ${question.survey.length ? html`
-        <form class="survey" data-question="${question.id}" aria-label="Survey for Q${index + 1}" novalidate>
+        <div class="question-actions" data-question="${id}">
+          <span class="question-status"></span>
+          <button type="button" class="link-button" data-action="open-responses" aria-haspopup="dialog" hidden>See responses</button>
+          <button type="button" class="button button-small" data-action="open" aria-haspopup="dialog">Answer</button>
+        </div>
+        ${surveySheet(meeting, question, index)}` : ''}
+    </article>`;
+}
+
+// The survey of one question, in a sheet (a modal <dialog>) so the page can be
+// read without it. surveys.js opens it and brings the form to life.
+function surveySheet(meeting, question, index) {
+  const id = question.id;
+  return html`
+    <dialog class="sheet" id="sheet-${id}" data-question="${id}" aria-labelledby="sheet-title-${id}">
+      <header class="sheet-header">
+        <div class="sheet-heading">
+          <p class="question-label">Question ${index + 1}</p>
+          <h2 class="sheet-title" id="sheet-title-${id}" tabindex="-1">${question.text}</h2>
+        </div>
+        <button type="button" class="sheet-close" data-action="close" aria-label="Close"></button>
+      </header>
+      <div class="sheet-body">
+        <p class="notice survey-notice">${revealNote(meeting)}</p>
+        <p class="sheet-sign-in" hidden>
+          <button type="button" class="button" data-action="sign-in">Sign in with GitHub</button>
+        </p>
+        <form class="survey" data-question="${id}" aria-label="Your answer" novalidate>
           ${question.survey.map((f) => surveyField(question, f, true))}
           <div class="survey-actions" hidden>
             <button type="submit" class="button button-primary">Save answer</button>
@@ -147,25 +182,23 @@ function questionCard(meeting, question, index) {
             <span class="survey-status" role="status"></span>
           </div>
         </form>
-        <div class="survey-others" data-question="${question.id}" hidden>
+        <div class="survey-others" data-question="${id}" hidden>
           <button type="button" class="button" data-action="show">Show other responses</button>
           <span class="muted survey-others-note"></span>
           <p class="survey-others-status" role="status"></p>
           <div class="survey-results"></div>
-        </div>` : ''}
-    </article>`;
+        </div>
+      </div>
+    </dialog>`;
 }
 
 function preTab(meeting) {
-  const hasSurvey = meeting.questions.some((q) => q.survey.length);
   return html`
     ${section('Background', meeting.background_html && html`<div class="prose">${raw(meeting.background_html)}</div>`)}
     ${section('Pre-reading', meeting.prereading_html && html`<div class="prose">${raw(meeting.prereading_html)}</div>`)}
     ${meeting.questions.length ? html`
       <section class="block">
         <h2>Open questions</h2>
-        ${hasSurvey ? html`
-          <p class="notice" id="survey-notice" role="status">${revealNote(meeting)}</p>` : ''}
         ${meeting.questions.map((q, i) => questionCard(meeting, q, i))}
       </section>` : ''}
     ${!meeting.background_html && !meeting.prereading_html && !meeting.questions.length
@@ -237,7 +270,7 @@ export function meetingView(meeting, tab, today = localToday()) {
   return {
     title: `${meeting.title} – ${label}`,
     body: html`
-      <p class="breadcrumb"><a href="#/">← All meetings</a></p>
+      <p class="breadcrumb"><a href="#/">‹ All meetings</a></p>
       <h1 tabindex="-1">${meeting.title}</h1>
       ${meetingFacts(meeting)}
       <nav class="tabs" aria-label="Meeting sections">
