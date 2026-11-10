@@ -51,8 +51,8 @@ meeting-engine (this repo, public)          course repo (one per course)
 |---|-----------|--------|
 | 1 | Static site: meetings from content files, three tabs, Decisions page, deployed to Pages | done |
 | 2 | Backend (Supabase) + GitHub login + allowlist, enforced server-side; tried on the demo site | done (v0.2.0) |
-| 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering; names or anonymous; deleted after 30 days) | in progress |
-| 4 | Course template (in this repo) + step-by-step guide; first real course site online | planned |
+| 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering; names or anonymous; deleted after 30 days) | done (v0.3.0) |
+| 4 | Course template (in this repo) + step-by-step guide; first real course site online | next |
 | 5 | Live in-meeting notes | later, optional |
 | 6 | Agent automation (e.g. an OpenClaw agent turning transcripts into summaries) | later, optional |
 
