@@ -530,14 +530,19 @@ async function loadMeeting(dir, id, problems) {
   }
   const prefix = /^(\d{4}-\d{2}-\d{2})(?:-|$)/.exec(id)?.[1];
   if (date && prefix && prefix !== date) {
-    problems.error(file, `folder name starts with ${prefix} but "date" is ${date}; make them match`);
+    problems.error(file, `folder name starts with ${prefix} but "date" is ${date}; make them match `
+      + '(renaming the folder gives the meeting a new address, and its survey starts again without earlier answers)');
   }
 
   const responses = c.object(raw, 'responses');
-  checker(problems, file, 'responses').keys(responses, ['reveal']);
+  checker(problems, file, 'responses').keys(responses, ['reveal', 'anonymous']);
   const reveal = responses.reveal ?? REVEAL_MODES[0];
   if (!REVEAL_MODES.includes(reveal)) {
     problems.error(file, `"responses.reveal" must be one of ${REVEAL_MODES.join(', ')} (got "${reveal}")`);
+  }
+  const anonymous = responses.anonymous ?? false;
+  if (typeof anonymous !== 'boolean') {
+    problems.error(file, `"responses.anonymous" must be true or false (got ${JSON.stringify(anonymous)})`);
   }
 
   const questions = loadQuestions(c.list(raw, 'questions'), file, problems, md);
@@ -561,6 +566,7 @@ async function loadMeeting(dir, id, problems) {
     duration,
     location: c.string(raw, 'location'),
     reveal: REVEAL_MODES.includes(reveal) ? reveal : REVEAL_MODES[0],
+    anonymous: anonymous === true,
     background_html: await text('background.md'),
     prereading_html: await text('prereading.md'),
     guide_html: await text('guide.md'),

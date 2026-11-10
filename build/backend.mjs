@@ -4,7 +4,8 @@
 //   node build/backend.mjs sync --content <folder>       copy the team list (members:) to the backend
 //   node build/backend.mjs keepalive --content <folder>  record a heartbeat, so a free project isn't paused
 //
-// `sync` runs in the deploy job (see sync/action.yml) and needs:
+// `sync` runs in the deploy job (see sync/action.yml): it copies the team list
+// and each meeting's survey settings. It needs:
 //   SUPABASE_SECRET_KEY   the project's secret key (a GitHub environment secret)
 //   SUPABASE_URL          the project URL, written in the workflow. The secret
 //                         key is only sent there, and course.yml must agree.
@@ -148,6 +149,11 @@ async function callRpc(url, key, name, body, fetch) {
   }
 }
 
+/** Meeting ids from the backend's answer (only well-formed ones). */
+function keptAnonymous(value) {
+  return Array.isArray(value) ? value.filter((id) => typeof id === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id)) : [];
+}
+
 /** A count from the backend's answer, or "?" if it isn't a plain number. */
 function count(value) {
   return Number.isSafeInteger(value) && value >= 0 ? value : '?';
@@ -200,11 +206,38 @@ export async function run(command, { contentDir, env = process.env, fetch = glob
     p_repo_id: repoId,
     p_repo_name: oneLine(env.GITHUB_REPOSITORY ?? ''),
   }, fetch);
+  const meetings = await callRpc(backend.url, secretKey, 'sync_meetings', {
+    p_course: backend.course_id,
+    p_repo_id: repoId,
+    p_meetings: surveySettings(content.site.meetings),
+  }, fetch);
   return [
     `Team list of course "${backend.course_id}" copied to ${backend.url}:`,
     ...members.map((m) => `  ${m.github_login} (GitHub id ${m.github_id})`),
     `${count(result?.members)} member(s): ${count(result?.added)} added, ${count(result?.removed)} removed.`,
+    `Survey settings of ${count(meetings?.meetings)} meeting(s) copied; ${count(meetings?.deleted_answers)} answer(s) `
+      + 'older than 30 days after their meeting deleted.',
+    ...keptAnonymous(meetings?.kept_anonymous).map((id) => `Note: meeting ${id} stays anonymous. Its answers were `
+      + 'given under that promise, so names are never shown for it, even though meeting.yml no longer says anonymous: true.'),
   ];
+}
+
+/**
+ * What the backend needs to know about each meeting to check answers: date
+ * (answers are deleted 30 days later), reveal mode, anonymity, and the survey
+ * fields of each question.
+ */
+export function surveySettings(meetings) {
+  return meetings.map((m) => ({
+    id: m.id,
+    date: m.date,
+    reveal: m.reveal,
+    anonymous: m.anonymous,
+    questions: Object.fromEntries(m.questions.filter((q) => q.survey.length).map((q) => [
+      q.id,
+      q.survey.map((f) => ({ id: f.id, type: f.type, options: f.options, required: f.required })),
+    ])),
+  }));
 }
 
 async function main() {

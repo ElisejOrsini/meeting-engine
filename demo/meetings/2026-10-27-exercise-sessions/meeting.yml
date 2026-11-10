@@ -6,6 +6,7 @@ duration: 45
 location: Room CAB G 52
 responses:
   reveal: anytime
+  anonymous: true   # teammates see the answers, not who gave them
 
 agenda:
   - title: How the first weeks went

@@ -10,6 +10,7 @@
 
 import { html } from './dom.js';
 import { startAuth, takeAuthRedirect } from './auth.js';
+import { attachSurveys, detachSurveys } from './surveys.js';
 import {
   TABS, defaultTab, meetingsView, meetingView, decisionsView, decisionCount, decisionList,
   allDecisions, filterDecisions, notFoundView, errorView,
@@ -50,6 +51,7 @@ function route() {
   const firstRender = lastPath === null;
   const pathChanged = path !== lastPath;
   lastPath = path;
+  detachSurveys();
 
   if (parts.length === 0) {
     show(meetingsView(site), 'meetings');
@@ -58,7 +60,10 @@ function route() {
     const tab = parts[2] ?? (meeting && defaultTab(meeting));
     if (!meeting) show(notFoundView('There is no meeting with this address.'), 'meetings');
     else if (!TABS.some((t) => t.id === tab)) show(notFoundView(), 'meetings');
-    else show(meetingView(meeting, tab), 'meetings');
+    else {
+      show(meetingView(meeting, tab), 'meetings');
+      if (tab === 'pre') attachSurveys(main, meeting, site.backend);
+    }
   } else if (parts[0] === 'decisions' && parts.length === 1) {
     show(decisionsView(site, params.get('q') ?? ''), 'decisions');
     wireDecisionSearch();
@@ -116,13 +121,14 @@ async function start() {
   const footer = document.getElementById('footer-text');
   footer.innerHTML = String(html`Built with <a href="https://github.com/ElisejOrsini/meeting-engine" rel="noopener">meeting-engine</a> v${site.engine.version}`);
   window.addEventListener('hashchange', route);
+  // Start sign-in first: its first, synchronous step marks the state as
+  // "loading", so the first page doesn't briefly say surveys are switched off.
+  const auth = site.backend && startAuth(site.backend, redirect, {
+    accountEl: document.getElementById('account'),
+    noticeEl: document.getElementById('site-notice'),
+  });
   route();
-  if (site.backend) {
-    await startAuth(site.backend, redirect, {
-      accountEl: document.getElementById('account'),
-      noticeEl: document.getElementById('site-notice'),
-    });
-  }
+  await auth;
 }
 
 start();

@@ -28,6 +28,25 @@ const MESSAGES = {
 };
 const INFO_MESSAGES = new Set(['signed-out']); // shown neutral, not as a warning
 
+// Other parts of the site (surveys) follow the sign-in state through onAuth().
+// status: none (no backend) | loading | signed-out | unavailable |
+//         member | not-member | member-unknown
+let current = { status: 'none', login: null, client: null };
+const listeners = new Set();
+
+/** Call `listener(state)` now and whenever the sign-in state changes. Returns an unsubscribe function. */
+export function onAuth(listener) {
+  listeners.add(listener);
+  listener(current);
+  return () => listeners.delete(listener);
+}
+
+function publish(next) {
+  if (next.status === current.status && next.login === current.login && next.client === current.client) return;
+  current = next;
+  for (const listener of listeners) listener(current);
+}
+
 function takeSaved(key) {
   try {
     const value = sessionStorage.getItem(key);
@@ -114,6 +133,7 @@ export async function startAuth(backend, redirect, { accountEl, noticeEl }) {
         ? String(html`<p class="notice${INFO_MESSAGES.has(message) ? '' : ' notice-warn'}">${MESSAGES[message]}</p>`)
         : '';
     }
+    publish({ status, login: login ?? null, client });
   }
 
   async function update(session) {

@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // Local preview: rebuilds the site whenever a page is (re)loaded, then serves it.
 //
-//   node scripts/dev-server.mjs --content demo [--port 4321]
+//   node scripts/dev-server.mjs --content demo [--port 4321] [--mock-backend]
+//
+// --mock-backend replaces the Supabase client with scripts/mock-supabase.js:
+// sign-in and survey answers are simulated in the browser, so they can be
+// tried without a real sign-in.
 
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { copyFile, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -15,11 +19,14 @@ const { values } = parseArgs({
   options: {
     content: { type: 'string', default: 'demo' },
     port: { type: 'string', default: '4321' },
+    'mock-backend': { type: 'boolean', default: false },
   },
 });
 
 const ENGINE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ENGINE_ROOT, '.dev-site');
+// One build folder per port, so two previews (e.g. with and without the mock
+// backend) don't overwrite each other.
+const OUT = path.join(ENGINE_ROOT, '.dev-site', values.port);
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -52,6 +59,9 @@ function rebuild() {
         outDir: OUT,
         log: { ...quietLog, error: (m) => errors.push(m) },
       });
+      if (result.ok && values['mock-backend'] && result.site.backend) {
+        await copyFile(path.join(ENGINE_ROOT, 'scripts', 'mock-supabase.js'), path.join(OUT, 'vendor', 'supabase.js'));
+      }
       return { ok: result.ok, errors };
     } catch (err) {
       return { ok: false, errors: [String(err?.stack ?? err)] };
@@ -107,4 +117,5 @@ const server = createServer(async (req, res) => {
 // 127.0.0.1: reachable only from this computer, not from the network.
 server.listen(Number(values.port), '127.0.0.1', () => {
   console.log(`Preview: http://localhost:${values.port}/  (reload the page to rebuild)`);
+  if (values['mock-backend']) console.log('Mock backend: sign-in and survey answers are simulated in this browser.');
 });

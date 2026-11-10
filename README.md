@@ -12,8 +12,10 @@ teams). Each meeting gets three tabs:
 A **Decisions** page collects every decision from every meeting and lets you
 search them.
 
-Team members can sign in with GitHub. Only people on the course's team list
-can sign in; the list lives in the course repository.
+Team members can sign in with GitHub and answer the surveys. Only people on the
+course's team list can sign in; the list lives in the course repository.
+Answering is optional; others' answers are shown on request (or only after
+answering), with names or anonymously, and deleted 30 days after the meeting.
 
 **Demo:** https://elisejorsini.github.io/meeting-engine/ (made-up example course;
 sign-in only works for the demo's own team list)
@@ -34,7 +36,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 - On every push, GitHub Actions builds the site and publishes it on
   GitHub Pages. No server is needed.
 - Course repos use the engine at a pinned version
-  (`uses: ElisejOrsini/meeting-engine@v0.2.0`). To give a course a newer
+  (`uses: ElisejOrsini/meeting-engine@v0.3.0`). To give a course a newer
   engine, change the version in its workflow (in every `uses:` line of the
   engine, if there are several).
 - The permanent record (summaries and decisions) always lives in git.
@@ -49,7 +51,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 |---|-----------|--------|
 | 1 | Static site: meetings from content files, three tabs, Decisions page, deployed to Pages | done |
 | 2 | Backend (Supabase) + GitHub login + allowlist, enforced server-side; tried on the demo site | done (v0.2.0) |
-| 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering) | next |
+| 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering; names or anonymous; deleted after 30 days) | in progress |
 | 4 | Course template (in this repo) + step-by-step guide; first real course site online | planned |
 | 5 | Live in-meeting notes | later, optional |
 | 6 | Agent automation (e.g. an OpenClaw agent turning transcripts into summaries) | later, optional |
@@ -82,7 +84,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine@v0.2.0   # the engine version
+      - uses: ElisejOrsini/meeting-engine@v0.3.0   # the engine version
         with:
           content-dir: .
           out-dir: _site
@@ -117,6 +119,8 @@ You need [Node.js](https://nodejs.org) 22 or newer.
 ```bash
 npm install        # once
 npm run dev        # preview the demo at http://localhost:4321 (reload to rebuild)
+npm run dev:mock   # the same with a pretend backend at http://localhost:4322:
+                   # sign in and answer surveys without a real sign-in
 npm run check      # validate the demo content
 npm test           # run the tests
 npm run build      # build the demo into _site/
@@ -137,7 +141,8 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 | `docs/backend-setup.md` | Sign-in setup, click by click |
 | `test/` | Tests (`npm test`) |
 | `scripts/dev-server.mjs` | Local preview server |
-| `sync/action.yml` | The GitHub Action that copies a course's team list to Supabase (deploy job only) |
+| `scripts/mock-supabase.js` | Pretend backend for `npm run dev:mock` (never used on real sites) |
+| `sync/action.yml` | The GitHub Action that copies a course's team list and survey settings to Supabase (deploy job only) |
 | `keepalive/action.yml` | The GitHub Action that records a daily heartbeat so a free Supabase project isn't paused |
 | `.github/workflows/pages.yml` | Tests, builds `demo/`, copies its team list to Supabase and deploys it to Pages on every push to `main` |
 | `.github/workflows/keepalive.yml` | Daily heartbeat that keeps the shared Supabase project from pausing |
@@ -157,6 +162,12 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
   readable through database functions that look up the signed-in person's
   numeric GitHub id in the course's team list. New accounts are only created
   for people on a team list.
+- Survey answers: the database checks every answer against the meeting's
+  survey, lets people change only their own, and applies the reveal and
+  anonymity rules itself. "Anonymous" hides names from teammates (and once a
+  meeting is anonymous, it stays so); whoever runs the Supabase project can
+  still see who answered. Answers are deleted 30 days
+  after the meeting (nightly, and they are never shown after that).
 - Content is treated as untrusted, because it may be written by an AI agent
   from meeting transcripts. Raw HTML in Markdown is shown as text. Links may only
   be `https:`, `mailto:`, site pages or attachments. Images must be attachments
@@ -175,13 +186,15 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 
 ## Releasing a new engine version
 
-1. Make the change, run `npm test`, push to `main`, and check the demo site.
-2. Update `version` in `package.json`, commit, then create a tag and release,
+1. If the release adds a file to `supabase/migrations/`, run it first in the
+   SQL Editor of every Supabase project the engine uses, including the demo's
+   (see docs/backend-setup.md, step 2). The demo deploys from `main` with the
+   new code, so it fails until the database is ready.
+2. Make the change, run `npm test`, push to `main`, and check the demo site.
+3. Update `version` in `package.json`, commit, then create a tag and release,
    e.g. `git tag v0.3.0 && git push origin v0.3.0`.
-3. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
+4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
-4. If the release adds a file to `supabase/migrations/`, run it in the SQL
-   Editor before the course sites update (see docs/backend-setup.md, step 2).
 
 ## License
 

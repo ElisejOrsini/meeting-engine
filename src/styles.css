@@ -208,6 +208,39 @@ textarea {
 }
 input:disabled, textarea:disabled, input:disabled + span { opacity: 0.65; }
 
+.button-primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+.button-primary:hover { background: var(--accent); filter: brightness(1.08); }
+.button:disabled { opacity: 0.55; cursor: not-allowed; }
+.survey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.survey-actions[hidden], .survey-others[hidden] { display: none; }
+.survey-status { color: var(--muted); font-size: 0.95rem; }
+.survey-error { color: var(--warn); }
+.survey-others { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.survey-others-note { margin-left: 10px; font-size: 0.95rem; }
+.survey-others-status { margin: 8px 0 0; color: var(--muted); }
+.survey-others-status:empty { display: none; }
+.responses { margin-top: 12px; }
+.responses h4 { margin: 0 0 8px; }
+.responses h4:focus { outline: none; }
+.response-field { margin-bottom: 14px; }
+.response-label { margin: 0 0 6px; font-weight: 550; }
+.tally { list-style: none; margin: 0; padding: 0; }
+.tally li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 2fr) minmax(4rem, 3fr) 2.5rem;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 3px 0;
+}
+.tally-bar { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+.tally-bar > span { display: block; height: 100%; width: 0; background: var(--accent); }
+.tally-count { text-align: right; font-variant-numeric: tabular-nums; }
+.tally-names { grid-column: 1 / -1; color: var(--muted); font-size: 0.9rem; }
+.text-answers { list-style: none; margin: 0; padding: 0; }
+.text-answers li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.text-answers li:last-child { border-bottom: 0; }
+.text-answer { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 /* ----- agenda ----- */
 
 .agenda { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--border); }
@@ -219,6 +252,9 @@ input:disabled, textarea:disabled, input:disabled + span { opacity: 0.65; }
 
 @media (max-width: 520px) {
   .agenda-item { grid-template-columns: 1fr; gap: 0; }
+  .tally li { grid-template-columns: 1fr 2.5rem; }
+  .tally-bar { grid-column: 1 / -1; grid-row: 2; }
+  .survey-others-note { display: block; margin: 6px 0 0; }
   .tabs { gap: 0; }
   .tabs a { padding: 10px 6px; font-size: 0.9rem; }
   h1 { font-size: 1.6rem; }

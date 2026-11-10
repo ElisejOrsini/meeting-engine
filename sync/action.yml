@@ -1,4 +1,4 @@
-# meeting-engine: copy the team list to the backend.
+# meeting-engine: copy the team list and survey settings to the backend.
 #
 # For course sites with sign-in (a backend: section in course.yml). Run it in
 # the deploy job, which uses the github-pages environment and has the
@@ -6,13 +6,13 @@
 # github-pages only runs for the branch being deployed, so workflows on other
 # branches can't read the key. The full workflow is in docs/backend-setup.md.
 #
-#   - uses: ElisejOrsini/meeting-engine/sync@v0.2.0
+#   - uses: ElisejOrsini/meeting-engine/sync@v0.3.0
 #     with:
 #       supabase-url: https://abcdefghijklmnopqrst.supabase.co
 #       supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
 
-name: Meeting Engine team list sync
-description: Copy the team list (members in course.yml) of a meeting-engine site to its Supabase backend.
+name: Meeting Engine backend sync
+description: Copy the team list (members in course.yml) and each meeting's survey settings of a meeting-engine site to its Supabase backend.
 author: ElisejOrsini
 branding:
   icon: users
@@ -47,7 +47,7 @@ runs:
       shell: bash
       run: cd "$GITHUB_ACTION_PATH/.." && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
-    - name: Copy team list to the backend
+    - name: Copy team list and survey settings to the backend
       shell: bash
       env:
         CONTENT_DIR: ${{ inputs.content-dir }}

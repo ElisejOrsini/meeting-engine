@@ -196,17 +196,40 @@ const MAIN_ONLY = {
   [`${ENVIRONMENT_API}/deployment-branch-policies?per_page=100`]: () => [200, { branch_policies: [{ name: 'main', type: 'branch' }] }],
 };
 
-test('backend.mjs: sync sends the list to the configured project with the secret key', async () => {
-  const dir = await course(`name: T\n${BACKEND}members: [octocat]\n`);
+test('backend.mjs: sync sends the list and survey settings to the configured project with the secret key', async () => {
+  const dir = await course(`name: T\n${BACKEND}members: [octocat]\n`, {
+    'meetings/2026-01-05-a/meeting.yml': [
+      'title: A', 'date: 2026-01-05', 'responses:', '  reveal: after_answering', '  anonymous: true', 'questions:',
+      '  - id: q1', '    text: Q?', '    survey:', '      - id: pick', '        type: single', '        label: Pick',
+      '        options: [x, y]', '        required: true', '  - id: q2', '    text: No survey here',
+    ].join('\n'),
+  });
   const { fetch, calls } = fakeFetch({
     ...MAIN_ONLY,
     'https://api.github.com/users/octocat': () => [200, { login: 'octocat', id: 583231, type: 'User' }],
     [`${URL}/rest/v1/rpc/sync_course`]: () => [200, { course: 'widgets-2026', members: 1, added: 1, removed: 0 }],
+    [`${URL}/rest/v1/rpc/sync_meetings`]: () => [200, {
+      course: 'widgets-2026', meetings: 1, deleted_answers: 'x', kept_anonymous: ['2026-01-05-a', 'bad id\n::error::x'],
+    }],
   });
   const lines = await run('sync', { contentDir: dir, env: ENV, fetch });
   assert.match(lines.join('\n'), /octocat \(GitHub id 583231\)/);
   assert.match(lines.join('\n'), /1 added, 0 removed/);
-  const rpc = calls.at(-1);
+  assert.match(lines.join('\n'), /Survey settings of 1 meeting\(s\) copied; \? answer\(s\)/);
+  assert.equal(lines.filter((l) => l.startsWith('Note: meeting 2026-01-05-a stays anonymous')).length, 1);
+  assert.ok(!lines.join('\n').includes('bad id'), 'malformed ids from the backend are not printed');
+  const meetingsCall = calls.at(-1);
+  assert.equal(meetingsCall.url, `${URL}/rest/v1/rpc/sync_meetings`);
+  assert.equal(meetingsCall.init.headers.apikey, SECRET);
+  assert.deepEqual(JSON.parse(meetingsCall.init.body), {
+    p_course: 'widgets-2026',
+    p_repo_id: 4242,
+    p_meetings: [{
+      id: '2026-01-05-a', date: '2026-01-05', reveal: 'after_answering', anonymous: true,
+      questions: { q1: [{ id: 'pick', type: 'single', options: ['x', 'y'], required: true }] },
+    }],
+  });
+  const rpc = calls.at(-2);
   assert.equal(rpc.init.headers.apikey, SECRET);
   assert.equal(rpc.init.headers.authorization, undefined);
   assert.equal(rpc.init.redirect, 'error');

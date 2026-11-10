@@ -5,7 +5,7 @@ time: "14:00"
 duration: 60
 location: Room HG E 33 and online
 responses:
-  reveal: after_answering   # others' answers unlock after you submit your own
+  reveal: after_answering   # others' answers to a question unlock once you've answered it
 
 agenda:
   - title: Welcome and goals for today

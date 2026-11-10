@@ -7,7 +7,7 @@ links:
   - title: Engine source on GitHub
     url: https://github.com/ElisejOrsini/meeting-engine
 
-# Sign-in and (later) survey answers. Both values are public by design: the
+# Sign-in and survey answers. Both values are public by design: the
 # publishable key only allows what the database rules allow. Never put the
 # secret key (sb_secret_...) here; it belongs in a GitHub environment secret.
 backend:

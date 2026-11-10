@@ -7,7 +7,8 @@ time: "14:00"
 duration: 60
 location: Room or link
 responses:
-  reveal: anytime   # or: after_answering (others' answers unlock only after you answer)
+  reveal: anytime   # or: after_answering (others' answers to a question unlock once you've answered it)
+  anonymous: false  # or: true (teammates see the answers, not who gave them)
 
 agenda:
   - title: First agenda item

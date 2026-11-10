@@ -83,8 +83,11 @@ responses:
   reveal: anytime                 # anytime (default) | after_answering
   # Answering is always optional. Others' answers start hidden in both modes.
   # anytime: anyone on the team can click "Show other responses", answered or not
-  # after_answering: the button only works once you've submitted your own answer
-  #   (avoids anchoring; people who don't answer never see the others)
+  # after_answering: for each question, the button only works once you've
+  #   answered it yourself (avoids anchoring; people who don't answer never
+  #   see the others)
+  anonymous: false                # optional, default false; true: teammates see
+                                  # the answers but not who gave them
 
 agenda:                           # optional, shown on the In-meeting tab
   - title: Survey results on grace periods   # required
@@ -107,6 +110,33 @@ questions:                        # optional, shown on the Pre-meeting tab
         type: text
         label: Why?
 ```
+
+## Survey answers
+
+With sign-in set up (`backend:` in `course.yml`, see
+[backend-setup.md](backend-setup.md)), team members can answer the survey
+fields on the Pre-meeting tab:
+
+- Answering is optional, and everyone can change or remove their answer at any
+  time.
+- Others' answers are shown on request, following `responses.reveal`. Names are
+  shown next to answers, unless the meeting has `responses.anonymous: true`.
+- Answers are deleted automatically **30 days after the meeting**. Anything
+  worth keeping belongs in `summary.md` or `decisions.yml`.
+- `anonymous: true` is a promise: once a deploy has made a meeting anonymous, it
+  stays anonymous, even if the line is removed later (the deploy log then says
+  so). Turning it on later also hides the names of earlier answers.
+- After changing a meeting's survey, deploy (push) before people answer: the
+  backend checks answers against the survey of the last deploy. If you rename
+  an option, earlier answers keep the old text (shown as "no longer an option").
+- Answers are stored by meeting folder, question id and field id. Renaming a
+  meeting folder (also when a meeting is rescheduled, since the folder name
+  starts with the date) or a question id, or removing a survey, hides the
+  earlier answers on the site. Renaming a field id hides what was answered in
+  that field, but those answers still count as responses until people answer
+  again. Hidden answers are deleted 30 days after the date the meeting had when
+  they were given. So reschedule or rename before people answer, or ask them to
+  answer again.
 
 ## decisions.yml
 

@@ -1,7 +1,7 @@
 # Backend setup: GitHub sign-in with a team list
 
-The website itself is static and public. Sign-in (and, from Milestone 3, survey
-answers) uses a small [Supabase](https://supabase.com) project:
+The website itself is static and public. Sign-in and survey answers use a
+small [Supabase](https://supabase.com) project:
 
 - People sign in with their GitHub account.
 - Only GitHub accounts on a course's team list (`members:` in `course.yml`) can
@@ -10,6 +10,8 @@ answers) uses a small [Supabase](https://supabase.com) project:
   each person's numeric GitHub account id (which never changes, unlike usernames).
 - One Supabase project can serve several course sites; each course has its own
   `course_id` and its own team list.
+- Survey answers are stored there, readable only by the course's team, and
+  deleted automatically 30 days after the meeting.
 
 Steps 1–3 happen once per Supabase project. Steps 4–8 happen once per course
 site, in this order.
@@ -55,10 +57,13 @@ put keys in screenshots or slides either.
 
 ## 2. Set up the database (once, and again for each new file)
 
+The folder [`supabase/migrations/`](../supabase/migrations) has one file per
+part, to be run in order (part 1: team lists and sign-in; part 2: survey
+answers, which also sets up the nightly deletion of old answers). For each file:
+
 1. In the project, open **SQL Editor** (left sidebar) and click **New query**.
-2. Open the file in [`supabase/migrations/`](../supabase/migrations) on GitHub,
-   click the **Copy raw file** button, paste everything into the editor, and
-   click **Run**.
+2. Open the file on GitHub, click the **Copy raw file** button, paste
+   everything into the editor, and click **Run**.
 3. Supabase may warn about a **destructive operation**. That's expected: the
    file replaces older versions of its own rules and functions, and deletes
    nothing else. Click **Run this query**.
@@ -133,12 +138,13 @@ one, then update the GitHub secret.
 
 ## 7. Copy the team list on every deploy (workflow)
 
-Sign-in needs engine **v0.2.0 or newer**. Do this before step 8: until
+Sign-in needs engine **v0.2.0 or newer**, survey answers **v0.3.0 or newer**.
+Do this before step 8: until
 `course.yml` has a `backend:` section, the sync step just says "nothing to do".
 
 In `.github/workflows/deploy.yml`:
 
-1. Change the build step to `uses: ElisejOrsini/meeting-engine@v0.2.0`.
+1. Change the build step to `uses: ElisejOrsini/meeting-engine@v0.3.0`.
 2. Replace the whole `deploy:` job with the one below. Put your Project URL in
    `supabase-url`.
 
@@ -160,7 +166,7 @@ Both `uses:` lines of the engine must have the same version.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine/sync@v0.2.0
+      - uses: ElisejOrsini/meeting-engine/sync@v0.3.0
         with:
           supabase-url: https://abcdefghijklmnopqrst.supabase.co   # your Project URL
           supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -174,8 +180,10 @@ ever sent to that address, and `backend.url` in `course.yml` must match it.
 If the sync fails (for example, a username has a typo or the secret is
 missing), the site isn't published and the error says what to fix.
 
-The first deploy ties the `course_id` to this repository, so another
-repository can't replace this course's team list.
+The sync also copies each meeting's survey settings (date, reveal mode,
+anonymity and fields), so the database can check answers. The first deploy
+ties the `course_id` to this repository, so another repository can't replace
+this course's team list or settings.
 
 ## 8. Configure the course (`course.yml`)
 
@@ -234,7 +242,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine/keepalive@v0.2.0
+      - uses: ElisejOrsini/meeting-engine/keepalive@v0.3.0
 ```
 
 - If the project was paused anyway, the workflow fails and GitHub emails you.
@@ -252,10 +260,13 @@ jobs:
 | "Sign-in isn't available right now" | The project may be paused (see above), or the database setup (step 2) hasn't been run. |
 | After sign-in, GitHub sends you to a different site | Add the site's exact address to **Redirect URLs** (step 5). |
 | Build error `unknown key "backend"` | The build step still uses an engine older than v0.2.0 (step 7). |
+| Build error `unknown key "responses.anonymous"` | The build step still uses an engine older than v0.3.0 (step 7). |
 | Deploy error "SUPABASE_SECRET_KEY secret is missing" | Do step 6 and step 7. |
 | Deploy error "… lets every branch use its secret" or "must allow only the branch" | Fix the branch rule (step 6.2), then re-run the workflow. |
 | Deploy error "could not read the github-pages environment's settings" | Add `actions: read` to the deploy job's permissions (step 7). |
-| Deploy error "HTTP 404 … database setup" | Do step 2. |
+| Deploy error "HTTP 404 … database setup" | Do step 2 (all files, in order). |
+| "Couldn't save your answer: this meeting has no survey (yet)" | Most likely the sync step still uses an engine older than v0.3.0: both `uses:` lines must have the same version (step 7). Otherwise the meeting was added after the last deploy: push, wait for the deploy, then try again. |
+| "Answering isn't available right now" | Same as "Sign-in isn't available right now". |
 | Deploy error "… is not the project this workflow allows" | `backend.url` in `course.yml` and `supabase-url` in the workflow differ; fix the wrong one. |
 | Deploy error "course id … already belongs to repository …" | Pick another `course_id`, or follow the instructions in the message if you replaced the repository. |
 | Deploy error "the GitHub username … now belongs to a different account" | See "Changing the team". |

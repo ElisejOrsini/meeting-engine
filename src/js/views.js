@@ -110,7 +110,7 @@ function surveyField(question, field, disabled) {
     return html`
       <div class="field">
         <label for="${name}">${field.label}${req}</label>
-        <textarea id="${name}" name="${name}" rows="3" ${disabled ? 'disabled' : ''}></textarea>
+        <textarea id="${name}" name="${name}" rows="3" maxlength="4000" data-field="${field.id}" ${disabled ? 'disabled' : ''}></textarea>
       </div>`;
   }
   const type = field.type === 'single' ? 'radio' : 'checkbox';
@@ -118,13 +118,13 @@ function surveyField(question, field, disabled) {
     <fieldset class="field">
       <legend>${field.label}${req}${field.type === 'multiple' ? html` <span class="muted">(choose any)</span>` : ''}</legend>
       ${field.options.map((option, i) => html`
-        <label class="option"><input type="${type}" name="${name}" value="${i}" ${disabled ? 'disabled' : ''}> <span>${option}</span></label>`)}
+        <label class="option"><input type="${type}" name="${name}" value="${i}" data-field="${field.id}" ${disabled ? 'disabled' : ''}> <span>${option}</span></label>`)}
     </fieldset>`;
 }
 
-function revealNote(meeting) {
+export function revealNote(meeting) {
   return meeting.reveal === 'after_answering'
-    ? 'Answering is optional. Others’ answers become visible once you’ve submitted your own.'
+    ? 'Answering is optional. Others’ answers to a question become visible once you’ve answered it yourself.'
     : 'Answering is optional. Others’ answers stay hidden until you click “Show other responses”.';
 }
 
@@ -139,9 +139,20 @@ function questionCard(meeting, question, index) {
       </header>
       ${question.details_html ? html`<div class="prose">${raw(question.details_html)}</div>` : ''}
       ${question.survey.length ? html`
-        <form class="survey" aria-label="Survey for Q${index + 1}">
+        <form class="survey" data-question="${question.id}" aria-label="Survey for Q${index + 1}" novalidate>
           ${question.survey.map((f) => surveyField(question, f, true))}
-        </form>` : ''}
+          <div class="survey-actions" hidden>
+            <button type="submit" class="button button-primary">Save answer</button>
+            <button type="button" class="link-button" data-action="clear" hidden>Remove my answer</button>
+            <span class="survey-status" role="status"></span>
+          </div>
+        </form>
+        <div class="survey-others" data-question="${question.id}" hidden>
+          <button type="button" class="button" data-action="show">Show other responses</button>
+          <span class="muted survey-others-note"></span>
+          <p class="survey-others-status" role="status"></p>
+          <div class="survey-results"></div>
+        </div>` : ''}
     </article>`;
 }
 
@@ -154,7 +165,7 @@ function preTab(meeting) {
       <section class="block">
         <h2>Open questions</h2>
         ${hasSurvey ? html`
-          <p class="notice">Answering surveys isn’t switched on for this site yet. ${revealNote(meeting)}</p>` : ''}
+          <p class="notice" id="survey-notice" role="status">${revealNote(meeting)}</p>` : ''}
         ${meeting.questions.map((q, i) => questionCard(meeting, q, i))}
       </section>` : ''}
     ${!meeting.background_html && !meeting.prereading_html && !meeting.questions.length
