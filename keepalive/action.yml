@@ -14,7 +14,7 @@
 #         - uses: actions/checkout@v7
 #           with:
 #             persist-credentials: false
-#         - uses: ElisejOrsini/meeting-engine/keepalive@v0.3.0
+#         - uses: ElisejOrsini/meeting-engine/keepalive@v0.4.0
 
 name: Meeting Engine keep-alive
 description: Record a daily heartbeat in a meeting-engine site's Supabase backend, so a free project isn't paused.

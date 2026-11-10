@@ -36,7 +36,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 - On every push, GitHub Actions builds the site and publishes it on
   GitHub Pages. No server is needed.
 - Course repos use the engine at a pinned version
-  (`uses: ElisejOrsini/meeting-engine@v0.3.0`). To give a course a newer
+  (`uses: ElisejOrsini/meeting-engine@v0.4.0`). To give a course a newer
   engine, change the version in its workflow (in every `uses:` line of the
   engine, if there are several).
 - The permanent record (summaries and decisions) always lives in git.

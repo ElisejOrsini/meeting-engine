@@ -1,6 +1,6 @@
 {
   "name": "meeting-engine",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Static site engine for team meetings: pre-meeting surveys, in-meeting guide, post-meeting summaries and decisions.",
   "type": "module",
