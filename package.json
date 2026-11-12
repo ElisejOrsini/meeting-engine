@@ -1,6 +1,6 @@
 {
   "name": "meeting-engine",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Static site engine for team meetings: pre-meeting surveys, in-meeting guide, post-meeting summaries and decisions.",
   "type": "module",
@@ -13,7 +13,8 @@
     "check": "node build/build.mjs --content demo --check",
     "dev": "node scripts/dev-server.mjs --content demo",
     "test": "node --test \"test/*.test.mjs\"",
-    "dev:mock": "node scripts/dev-server.mjs --content demo --port 4322 --mock-backend"
+    "dev:mock": "node scripts/dev-server.mjs --content demo --port 4322 --mock-backend",
+    "dev:private": "node scripts/dev-server.mjs --content demo-private --port 4323 --local-backend --import demo"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",

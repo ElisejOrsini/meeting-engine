@@ -2,7 +2,7 @@
 # To add a meeting: copy this folder to meetings/YYYY-MM-DD-short-name/
 # (for example meetings/2026-11-17-late-submissions/) and fill it in.
 # Only title and date are required; delete what you don't need.
-# Every option: https://github.com/ElisejOrsini/meeting-engine/blob/v0.4.0/docs/content-format.md
+# Every option: https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.0/docs/content-format.md
 title: Meeting title
 date: 2026-01-31
 time: "14:00"

@@ -1,0 +1,18 @@
+# Settings of this team's private meeting site. Every option is explained in
+# the engine's docs:
+# https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.0/docs/private-course.md
+#
+# This repository only configures the website: the meetings, the team list
+# and everything else the team writes live in the database, and only signed-in
+# team members can read them. This file is public; everything in it may be.
+
+name: "REPLACE_WITH_COURSE_NAME"   # shown in the header, also before sign-in
+private: true                      # content lives in the database, not here
+
+# The shared Supabase project. The URL and the publishable key are public by
+# design. Never put the secret key (sb_secret_...) here or anywhere in this
+# repository: this site doesn't need it.
+backend:
+  url: https://REPLACE-WITH-PROJECT-URL.supabase.co   # Project URL
+  publishable_key: REPLACE_WITH_PUBLISHABLE_KEY        # Settings → API Keys
+  course_id: REPLACE_WITH_COURSE_ID                    # e.g. widgetry-2026, as created in the SQL Editor

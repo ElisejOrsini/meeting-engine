@@ -70,10 +70,12 @@ export function fileLinkPath(href) {
 /**
  * Create a renderer.
  *   assetBase: prefix for file links (e.g. "content/2026-11-17-foo/")
+ *   files: false shows links to files as plain text (private courses have no
+ *          attachments yet)
  * block(src, { headingOffset, source }) renders a document; `source` is a label
  * (usually a file name) recorded with every file link, see `fileLinks`.
  */
-export function createMarkdown({ assetBase = '' } = {}) {
+export function createMarkdown({ assetBase = '', files = true } = {}) {
   const fileLinks = [];
   let headingOffset = 0;
   let source = '';
@@ -92,7 +94,7 @@ export function createMarkdown({ assetBase = '' } = {}) {
       if (token.type !== 'link' && token.type !== 'image') return;
       const href = String(token.href ?? '').trim();
       const kind = classifyHref(href);
-      if (kind === 'blocked') {
+      if (kind === 'blocked' || (kind === 'file' && !files)) {
         token.blocked = true;
       } else if (token.type === 'image' && kind !== 'file') {
         // Images from other websites could track who views the page, so

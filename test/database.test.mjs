@@ -6,69 +6,8 @@
 // Run with: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
-
-const MIGRATIONS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations');
-const migrations = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()
-  .map((f) => readFileSync(path.join(MIGRATIONS, f), 'utf8'));
-
-const ALICE = '00000000-0000-0000-0000-000000000001'; // GitHub 1001
-const BOB = '00000000-0000-0000-0000-000000000002'; // GitHub 1002
-const EMAIL_ONLY = '00000000-0000-0000-0000-000000000003'; // email identity with "1001"
-const TWO_ACCOUNTS = '00000000-0000-0000-0000-000000000004'; // GitHub 2001 and 1001 (linked)
-const REPO = 555;
-
-async function setup() {
-  const db = new PGlite();
-  await db.exec(`
-    create role anon nologin;
-    create role authenticated nologin;
-    create role service_role nologin bypassrls;
-    create role supabase_auth_admin nologin;
-    create role owner nologin bypassrls;  -- plays Supabase's "postgres" (not a superuser)
-    revoke all on schema public from public;
-    alter schema public owner to owner;
-    grant create on database postgres to owner;
-    grant anon, authenticated, service_role to owner;
-    grant usage on schema public to anon, authenticated, service_role;
-    alter default privileges for role owner in schema public grant all on tables to anon, authenticated, service_role;
-    alter default privileges for role owner in schema public grant all on functions to anon, authenticated, service_role;
-
-    create schema auth;
-    create table auth.identities (user_id uuid, provider text, provider_id text);
-    create function auth.uid() returns uuid language sql stable as
-      $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    grant usage on schema auth to anon, authenticated, service_role, owner;
-    grant execute on function auth.uid() to anon, authenticated, service_role, owner;
-    grant select on auth.identities to owner;
-    insert into auth.identities values
-      ('${ALICE}', 'github', '1001'),
-      ('${BOB}', 'github', '1002'),
-      ('${EMAIL_ONLY}', 'email', '1001'),
-      ('${TWO_ACCOUNTS}', 'github', '2001'),
-      ('${TWO_ACCOUNTS}', 'github', '1001');
-  `);
-  await db.exec('set role owner;');
-  for (const sql of migrations) await db.exec(sql);
-  for (const sql of migrations) await db.exec(sql); // safe to run twice
-  await db.exec('reset role;');
-  return db;
-}
-
-function actor(db) {
-  return async function as(role, sql, params = [], uid = '') {
-    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid}', false); set role ${role};`);
-    try {
-      return (await db.query(sql, params)).rows;
-    } finally {
-      await db.exec('reset role;');
-    }
-  };
-}
+import { setup, actor, ALICE, BOB, EMAIL_ONLY, TWO_ACCOUNTS, REPO } from './db-setup.mjs';
 
 const members = (...list) => JSON.stringify(list.map(([id, login]) => ({ github_id: id, github_login: login })));
 
@@ -178,6 +117,69 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     'public.save_answer(text, text, text, jsonb)': ['authenticated', 'service_role'],
     'public.get_answers(text, text, boolean)': ['authenticated', 'service_role'],
     'public.sync_meetings(text, bigint, jsonb)': ['service_role'],
+    // Part 3, courses managed on the site: the website's functions need a signed-in user,
+    // the agent's need the publishable key (anon) plus an agent key; the rest is internal.
+    'private.get_course(text)': ['authenticated'],
+    'public.get_course(text)': ['authenticated', 'service_role'],
+    'private.get_versions(text, text, text)': ['authenticated'],
+    'public.get_versions(text, text, text)': ['authenticated', 'service_role'],
+    'private.get_version(text, text, text, integer)': ['authenticated'],
+    'public.get_version(text, text, text, integer)': ['authenticated', 'service_role'],
+    'private.save_part(text, text, text, jsonb, integer, text, boolean)': ['authenticated'],
+    'public.save_part(text, text, text, jsonb, integer, text, boolean)': ['authenticated', 'service_role'],
+    'private.create_meeting(text, text, jsonb)': ['authenticated'],
+    'public.create_meeting(text, text, jsonb)': ['authenticated', 'service_role'],
+    'private.set_published(text, text, boolean)': ['authenticated'],
+    'public.set_published(text, text, boolean)': ['authenticated', 'service_role'],
+    'private.update_course(text, text, text)': ['authenticated'],
+    'public.update_course(text, text, text)': ['authenticated', 'service_role'],
+    'private.add_member(text, bigint, text, text, boolean)': ['authenticated'],
+    'public.add_member(text, bigint, text, text, boolean)': ['authenticated', 'service_role'],
+    'private.update_member(text, bigint, text, boolean)': ['authenticated'],
+    'public.update_member(text, bigint, text, boolean)': ['authenticated', 'service_role'],
+    'private.remove_member(text, bigint)': ['authenticated'],
+    'public.remove_member(text, bigint)': ['authenticated', 'service_role'],
+    'private.create_agent_key(text, text, text)': ['authenticated'],
+    'public.create_agent_key(text, text, text)': ['authenticated', 'service_role'],
+    'private.revoke_agent_key(text, uuid)': ['authenticated'],
+    'public.revoke_agent_key(text, uuid)': ['authenticated', 'service_role'],
+    'private.agent_whoami()': ['anon'],
+    'private.agent_get_course()': ['anon'],
+    'private.agent_get_meeting(text)': ['anon'],
+    'private.agent_create_meeting(text, jsonb)': ['anon'],
+    'private.agent_update_meeting(text, integer, jsonb)': ['anon'],
+    'private.agent_put_section(text, text, integer, jsonb, text, boolean)': ['anon'],
+    'private.agent_put_course_notes(integer, text, text)': ['anon'],
+    'public.agent_whoami()': ['anon', 'service_role'],
+    'public.agent_get_course()': ['anon', 'service_role'],
+    'public.agent_get_meeting(text)': ['anon', 'service_role'],
+    'public.agent_create_meeting(text, text, text, integer, text)': ['anon', 'service_role'],
+    'public.agent_update_meeting(text, integer, jsonb)': ['anon', 'service_role'],
+    'public.agent_put_section(text, text, integer, jsonb, text, boolean)': ['anon', 'service_role'],
+    'public.agent_put_course_notes(integer, text, text)': ['anon', 'service_role'],
+    'private.agent_key(boolean)': [],
+    'private.answer_fits(jsonb, jsonb)': [],
+    'private.answers_affected(text, text, jsonb, jsonb)': [],
+    'private.check_array(jsonb, text, text, integer)': [],
+    'private.check_bool(jsonb, text, text)': [],
+    'private.check_int(jsonb, text, text, integer, integer)': [],
+    'private.check_keys(jsonb, text, text[], text[])': [],
+    'private.check_part(text, jsonb)': [],
+    'private.check_text(jsonb, text, text, integer, boolean, text)': [],
+    'private.check_unique_ids(jsonb, text)': [],
+    'private.create_course(text, text, text, bigint, text)': [],
+    'private.current_part(text, text, text)': [],
+    'private.guard_site_managed()': [],
+    'private.meeting_json(text, text)': [],
+    'private.meeting_links(text, text)': [],
+    'private.new_meeting(text, text, jsonb, bigint, uuid)': [],
+    'private.organizer_github_id(text)': [],
+    'private.refresh_meeting(text, text)': [],
+    'private.require_member(text)': [],
+    'private.require_organizer(text)': [],
+    'private.saved_by(private.revisions)': [],
+    'private.survey_map(jsonb)': [],
+    'private.write_part(text, text, text, jsonb, integer, text, boolean, bigint, uuid)': [],
   };
   for (const [fn, allowed] of Object.entries(expected)) {
     for (const role of ['anon', 'authenticated', 'service_role', 'supabase_auth_admin']) {
@@ -195,7 +197,11 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
   // Nothing else is reachable through the API (functions in "public").
   const fns = await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1`);
   assert.deepEqual(fns.rows.map((x) => x.proname),
-    ['get_answers', 'hook_before_user_created', 'is_member', 'keepalive', 'save_answer', 'sync_course', 'sync_meetings']);
+    ['add_member', 'agent_create_meeting', 'agent_get_course', 'agent_get_meeting', 'agent_put_course_notes',
+     'agent_put_section', 'agent_update_meeting', 'agent_whoami', 'create_agent_key', 'create_meeting',
+     'get_answers', 'get_course', 'get_version', 'get_versions', 'hook_before_user_created', 'is_member',
+     'keepalive', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_part', 'set_published',
+     'sync_course', 'sync_meetings', 'update_course', 'update_member']);
   const tables = await db.query(`select count(*)::int as n from pg_tables where schemaname = 'public'`);
   assert.equal(tables.rows[0].n, 0, 'no tables in the API schema');
 });

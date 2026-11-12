@@ -23,7 +23,7 @@ const MESSAGES = {
   cancelled: 'Sign-in was cancelled.',
   failed: 'Sign-in didn’t work. Please try again.',
   unavailable: 'Sign-in isn’t available right now (the backend didn’t answer). Try again later.',
-  'not-member': 'You’re signed in, but this GitHub account isn’t on this course’s team list. If you’re on the team, ask the course admin to add your GitHub username.',
+  'not-member': 'You’re signed in, but this GitHub account isn’t on this course’s team list. If you’re on the team, ask an organizer (or the course admin) to add your GitHub username.',
   'signed-out': 'You’re signed out.',
 };
 const INFO_MESSAGES = new Set(['signed-out']); // shown neutral, not as a warning

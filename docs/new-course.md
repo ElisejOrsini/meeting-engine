@@ -155,7 +155,7 @@ needed for it.
 
 ## Later: updating the engine
 
-The site keeps the engine version it pins (`@v0.4.0` in
+The site keeps the engine version it pins (`@v0.5.0` in
 `.github/workflows/deploy.yml`) until you change it. To get a newer version,
 for example a new design, change **every** `ElisejOrsini/meeting-engine…@`
 version in that file to the new one and push. If that version adds a file to

@@ -46,6 +46,7 @@ function plural(n, word) {
 /** The tab to open when a meeting link has no tab in it. */
 export function defaultTab(meeting, today = localToday()) {
   if (meeting.summary_html || meeting.decisions.length) return 'post';
+  if (!meeting.date) return 'pre'; // no time set yet
   if (meeting.date === today) return 'during';
   if (meeting.date < today) return 'post';
   return 'pre';
@@ -56,7 +57,8 @@ function questionById(meeting, id) {
 }
 
 function meetingFacts(meeting) {
-  const facts = [formatDate(meeting.date), timeRange(meeting), meeting.location].filter(Boolean);
+  const facts = [meeting.date ? formatDate(meeting.date) : 'Time not set yet', timeRange(meeting),
+    meeting.location_html ? raw(meeting.location_html) : meeting.location].filter(Boolean);
   return html`<p class="facts">${facts.map((f, i) => html`${i ? html`<span aria-hidden="true"> · </span>` : ''}<span>${f}</span>`)}</p>`;
 }
 
@@ -71,16 +73,17 @@ function section(title, content, { className = '' } = {}) {
 function meetingRow(meeting, today) {
   const surveyCount = meeting.questions.filter((q) => q.survey.length).length;
   const status = [];
+  if (meeting.draft) status.push(html`<span class="badge badge-draft">Draft</span>`);
   if (meeting.date === today) status.push(html`<span class="badge badge-today">Today</span>`);
-  if (meeting.date > today && surveyCount) status.push(html`<span>${plural(surveyCount, 'survey question')}</span>`);
+  if ((!meeting.date || meeting.date > today) && surveyCount) status.push(html`<span>${plural(surveyCount, 'survey question')}</span>`);
   if (meeting.decisions.length) status.push(html`<span class="status-ok">${plural(meeting.decisions.length, 'decision')}</span>`);
-  if (meeting.date < today && !meeting.summary_html) status.push(html`<span class="status-warn">Summary pending</span>`);
+  if (meeting.date && meeting.date < today && !meeting.summary_html) status.push(html`<span class="status-warn">Summary pending</span>`);
   return html`
     <li>
       <a class="row-link" href="${link('m', meeting.id)}">
         <span class="row-text">
           <span class="row-title">${meeting.title}</span>
-          <span class="row-subtitle">${formatDate(meeting.date)}${meeting.time ? ` · ${meeting.time}` : ''}</span>
+          <span class="row-subtitle">${meeting.date ? formatDate(meeting.date) : 'Time not set yet'}${meeting.time ? ` · ${meeting.time}` : ''}</span>
         </span>
         ${status.length ? html`<span class="row-meta">${status}</span>` : ''}
         <span class="chevron" aria-hidden="true"></span>
@@ -89,8 +92,10 @@ function meetingRow(meeting, today) {
 }
 
 export function meetingsView(site, today = localToday()) {
-  const upcoming = site.meetings.filter((m) => m.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-  const past = site.meetings.filter((m) => m.date < today); // already newest first
+  // Meetings without a time yet come last among the upcoming ones.
+  const upcoming = site.meetings.filter((m) => !m.date || m.date >= today)
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+  const past = site.meetings.filter((m) => m.date && m.date < today); // already newest first
   const list = (items, empty) => (items.length
     ? html`<ul class="list">${items.map((m) => meetingRow(m, today))}</ul>`
     : html`<p class="muted">${empty}</p>`);
@@ -101,7 +106,13 @@ export function meetingsView(site, today = localToday()) {
       ${site.course.description_html ? html`<div class="prose lead">${raw(site.course.description_html)}</div>` : ''}
       ${site.course.links.length ? html`<p class="course-links">${site.course.links.map((l) => html`<a href="${l.url}" rel="noopener">${l.title}</a>`)}</p>` : ''}
       <section class="block"><h2>Upcoming meetings</h2>${list(upcoming, 'No upcoming meetings yet.')}</section>
-      <section class="block"><h2>Past meetings</h2>${list(past, 'No past meetings yet.')}</section>`,
+      <section class="block"><h2>Past meetings</h2>${list(past, 'No past meetings yet.')}</section>
+      ${site.course.notes_html ? html`
+        <details class="block course-notes">
+          <summary><h2>Course notes and timeline</h2></summary>
+          <div class="prose">${raw(site.course.notes_html)}</div>
+          ${savedLine(site.course.notes_saved)}
+        </details>` : ''}`,
   };
 }
 
@@ -249,24 +260,66 @@ function decisionCard(decision, { meeting, showMeeting = false }) {
     </article>`;
 }
 
+function nextSteps(meeting) {
+  const steps = meeting.next_steps ?? [];
+  if (!steps.length) return '';
+  return section('Next steps', html`
+    <ul class="list next-steps">${steps.map((s) => html`
+      <li class="next-step">
+        <span class="next-step-what">${raw(s.what_html)}</span>
+        <span class="row-meta">${[s.owner && html`<span>${s.owner.match(/^[A-Za-z0-9-]+$/) ? `@${s.owner}` : s.owner}</span>`,
+          s.due && html`<span>${/^\d{4}-\d{2}-\d{2}$/.test(s.due) ? `by ${formatDate(s.due, { weekday: false })}` : s.due}</span>`]
+          .filter(Boolean)}</span>
+      </li>`)}
+    </ul>`);
+}
+
 function postTab(meeting, today) {
   const decided = new Set(meeting.decisions.map((d) => d.question).filter(Boolean));
-  const open = meeting.questions.filter((q) => !decided.has(q.id));
-  const happened = meeting.date < today || meeting.summary_html || meeting.decisions.length;
+  const listedOpen = meeting.open_items ?? [];
+  const listedIds = new Set(listedOpen.map((o) => o.question).filter(Boolean));
+  const open = meeting.questions.filter((q) => !decided.has(q.id) && !listedIds.has(q.id));
+  const happened = (meeting.date && meeting.date < today) || meeting.summary_html || meeting.decisions.length;
   return html`
     ${meeting.summary_html
       ? section('Summary', html`<div class="prose">${raw(meeting.summary_html)}</div>`)
       : html`<p class="notice">${happened ? 'The summary for this meeting hasn’t been added yet.' : 'The summary will appear here after the meeting.'}</p>`}
     ${meeting.decisions.length ? section(`Decisions (${meeting.decisions.length})`, html`
       ${meeting.decisions.map((d) => decisionCard(d, { meeting }))}`) : ''}
-    ${happened && open.length ? section('Still open', html`
-      <ul class="question-list">${open.map((q) => html`
+    ${nextSteps(meeting)}
+    ${happened && (open.length || listedOpen.length) ? section('Still open', html`
+      <ul class="question-list">${listedOpen.map((o) => {
+        const q = o.question && questionById(meeting, o.question);
+        return html`<li>${q ? html`<a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a>: ` : ''}${raw(o.text_html)}${o.next_html ? html` <span class="muted">Next: ${raw(o.next_html)}</span>` : ''}</li>`;
+      })}${open.map((q) => html`
         <li><a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a></li>`)}</ul>`) : ''}`;
 }
 
-export function meetingView(meeting, tab, today = localToday()) {
+// "Updated 12 Nov, 14:05 by OpenClaw (agent)" under a private course's content.
+function savedLine(saved) {
+  if (!saved?.saved_at) return '';
+  const when = new Date(saved.saved_at);
+  const text = Number.isNaN(when.getTime()) ? '' : when.toLocaleString('en-GB', {
+    timeZone: 'Europe/Zurich', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+  return html`<p class="saved-line muted small">Updated ${text} by ${saved.by}</p>`;
+}
+
+// Organizers see drafts; a banner says so and offers to publish.
+function draftBanner(meeting, canPublish) {
+  if (!meeting.draft) return '';
+  return html`
+    <div class="notice notice-draft" data-draft="${meeting.id}">
+      <p><strong>Draft.</strong> Only organizers can see this meeting.${canPublish ? ' Publish it when it’s ready for the team.' : ''}</p>
+      ${canPublish ? html`<button type="button" class="button button-small button-primary" data-action="publish">Publish</button>` : ''}
+      <span class="muted" role="status" data-publish-status></span>
+    </div>`;
+}
+
+export function meetingView(meeting, tab, today = localToday(), { organizer = false } = {}) {
   const content = tab === 'during' ? duringTab(meeting) : tab === 'post' ? postTab(meeting, today) : preTab(meeting);
   const label = TABS.find((t) => t.id === tab)?.label ?? '';
+  const saved = meeting.saved?.[tab === 'during' ? 'in' : tab];
   return {
     title: `${meeting.title} – ${label}`,
     body: html`
@@ -276,7 +329,8 @@ export function meetingView(meeting, tab, today = localToday()) {
       <nav class="tabs" aria-label="Meeting sections">
         ${TABS.map((t) => html`<a href="${link('m', meeting.id, t.id)}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}
       </nav>
-      <div class="tab-panel">${content}</div>`,
+      ${draftBanner(meeting, organizer)}
+      <div class="tab-panel">${content}${savedLine(saved)}</div>`,
   };
 }
 
@@ -324,6 +378,115 @@ export function decisionsView(site, query) {
       <p id="decision-count" class="muted" role="status">${decisionCount(shown.length, entries.length, query)}</p>
       <div id="decision-results">${decisionList(shown)}</div>`,
   };
+}
+
+// ---------- private courses: before sign-in, and the Team page ----------
+
+export function signInView(status) {
+  const text = {
+    loading: 'Checking your sign-in…',
+    'signed-out': 'The meetings of this team are private. Sign in with your GitHub account to see them.',
+    'not-member': 'There’s nothing to show for this account.', // the reason is in the notice above
+    unavailable: 'Sign-in isn’t available right now. Try again later.',
+    'member-unknown': 'Sign-in isn’t available right now. Try again later.',
+  }[status] ?? 'Loading…';
+  return {
+    title: 'Sign in',
+    body: html`
+      <h1 tabindex="-1">Team meetings</h1>
+      <p class="lead">${text}</p>
+      ${status === 'signed-out' ? html`<p><button type="button" class="button button-primary" data-action="sign-in">Sign in with GitHub</button></p>` : ''}`,
+  };
+}
+
+function memberRow(member, site) {
+  const organizer = site.me?.organizer;
+  const isMe = member.github_id === site.me?.github_id;
+  return html`
+    <li class="member" data-member="${member.github_id}">
+      <span class="row-text">
+        <span class="row-title">${member.name || `@${member.login}`}</span>
+        <span class="row-subtitle">@${member.login}${isMe ? ' · you' : ''}</span>
+      </span>
+      <span class="row-meta">
+        ${member.organizer ? html`<span class="badge">Organizer</span>` : ''}
+        ${organizer ? html`
+          <button type="button" class="link-button" data-action="toggle-organizer">${member.organizer ? 'Make member' : 'Make organizer'}</button>
+          <button type="button" class="link-button link-danger" data-action="remove-member">Remove</button>` : ''}
+      </span>
+    </li>`;
+}
+
+function keyRow(key) {
+  const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  return html`
+    <li class="member" data-key="${key.id}">
+      <span class="row-text">
+        <span class="row-title">${key.label} <span class="muted">${key.hint}</span></span>
+        <span class="row-subtitle">${key.permission === 'write' ? 'Read and write' : 'Read only'} · created ${when(key.created_at)} by @${key.created_by ?? '?'}
+          · ${key.revoked_at ? `revoked ${when(key.revoked_at)}` : key.last_used_at ? `last used ${when(key.last_used_at)}` : 'never used'}</span>
+      </span>
+      <span class="row-meta">
+        ${key.revoked_at ? html`<span class="badge">Revoked</span>` : html`<button type="button" class="link-button link-danger" data-action="revoke-key">Revoke</button>`}
+      </span>
+    </li>`;
+}
+
+export function teamView(site) {
+  const organizer = site.me?.organizer;
+  return {
+    title: 'Team',
+    body: html`
+      <h1 tabindex="-1">Team</h1>
+      <p class="lead">${organizer
+        ? 'Only the people listed here can sign in and see this team’s meetings. Organizers manage the list, agent keys and drafts.'
+        : 'Only the people listed here can sign in and see this team’s meetings. Organizers manage the list.'}</p>
+      <p class="muted" role="status" id="team-status"></p>
+      <section class="block">
+        <h2>People (${site.members.length})</h2>
+        <ul class="list members">${site.members.map((m) => memberRow(m, site))}</ul>
+      </section>
+      ${organizer ? html`
+        <section class="block">
+          <h2>Add someone</h2>
+          <form class="team-form" id="add-member" novalidate>
+            <div class="field"><label for="new-login">GitHub username</label>
+              <input id="new-login" name="login" autocomplete="off" autocapitalize="off" spellcheck="false" required></div>
+            <div class="field"><label for="new-name">Name <span class="muted">(optional)</span></label>
+              <input id="new-name" name="name" autocomplete="off"></div>
+            <label class="option"><input type="checkbox" name="organizer"> <span>Organizer</span></label>
+            <div class="survey-actions"><button type="submit" class="button button-primary">Add</button></div>
+          </form>
+        </section>
+        <section class="block">
+          <h2>Agent keys</h2>
+          <p class="muted">A key lets an AI agent (for example OpenClaw) read this course and, with write access, save meeting drafts and new versions. It can’t change the team or keys, publish meetings, or see who gave which answer.</p>
+          ${site.agent_keys?.length ? html`<ul class="list members">${site.agent_keys.map(keyRow)}</ul>` : html`<p class="muted">No keys yet.</p>`}
+          <form class="team-form" id="add-key" novalidate>
+            <div class="field"><label for="key-label">Label</label>
+              <input id="key-label" name="label" value="OpenClaw" maxlength="60" required></div>
+            <fieldset class="field"><legend>Access</legend>
+              <div class="options">
+                <label class="option"><input type="radio" name="permission" value="write" checked> <span>Read and write</span></label>
+                <label class="option"><input type="radio" name="permission" value="read"> <span>Read only</span></label>
+              </div>
+            </fieldset>
+            <div class="survey-actions"><button type="submit" class="button">Create key</button></div>
+          </form>
+          <div id="new-key" hidden></div>
+        </section>` : ''}`,
+  };
+}
+
+/** Shown once, right after a key was created. */
+export function newKeyNotice(key) {
+  return html`
+    <div class="notice notice-warn new-key">
+      <p><strong>Copy this key now.</strong> It won’t be shown again. Put it straight into the agent’s secret settings; don’t paste it into a chat, an email or a file in a repository.</p>
+      <p><code class="key-value" id="key-value">${key}</code></p>
+      <button type="button" class="button button-small" data-action="copy-key">Copy</button>
+      <span class="muted" role="status" id="copy-status"></span>
+    </div>`;
 }
 
 export function notFoundView(message = 'This page doesn’t exist.') {

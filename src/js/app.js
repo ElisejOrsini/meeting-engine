@@ -5,20 +5,30 @@
 //   #/m/<meeting-id>           a meeting (picks a sensible tab)
 //   #/m/<meeting-id>/<tab>     tab = pre | during | post   (?focus=<question-id>)
 //   #/decisions?q=<search>     all decisions, searchable
+//   #/team                     the team list and agent keys (private courses)
 //
-// Sign-in (only with a backend in course.yml) lives in auth.js.
+// Sign-in (only with a backend in course.yml) lives in auth.js. Private
+// courses (course.yml: private: true) have no content in data/site.json: it
+// is loaded from the database after sign-in (private.js), and dropped again
+// on sign-out.
 
 import { html } from './dom.js';
-import { startAuth, takeAuthRedirect } from './auth.js';
+import { onAuth, startAuth, takeAuthRedirect } from './auth.js';
 import { attachSurveys, detachSurveys } from './surveys.js';
 import {
   TABS, defaultTab, meetingsView, meetingView, decisionsView, decisionCount, decisionList,
-  allDecisions, filterDecisions, notFoundView, errorView,
+  allDecisions, filterDecisions, notFoundView, errorView, signInView, teamView,
 } from './views.js';
+import { toSite } from './private.js';
+import { attachTeam, attachPublish } from './team.js';
 
 const main = document.getElementById('main');
-let site = null;
+let config = null; // data/site.json
+let site = null; // what the pages show; for private courses only while signed in as a member
 let lastPath = null;
+let auth = { status: 'loading', login: null, client: null };
+let loadGeneration = 0;
+let loadError = null;
 
 function parseHash() {
   const hash = location.hash.replace(/^#\/?/, '');
@@ -41,17 +51,30 @@ function setNav(active) {
 
 function show(view, nav) {
   main.innerHTML = String(view.body);
-  document.title = `${view.title} · ${site?.course.name ?? 'Meetings'}`;
+  document.title = `${view.title} · ${site?.course.name ?? config?.course.name ?? 'Meetings'}`;
   setNav(nav);
 }
 
+function showSignIn() {
+  detachSurveys();
+  show(loadError ? errorView(loadError) : signInView(auth.status), null);
+  main.querySelector('[data-action="sign-in"]')?.addEventListener('click', () => {
+    document.querySelector('[data-auth="sign-in"]')?.click();
+  });
+}
+
 function route() {
-  if (!site) return;
+  if (!config) return;
+  if (!site) {
+    if (config.private) showSignIn();
+    return;
+  }
   const { parts, params, path } = parseHash();
   const firstRender = lastPath === null;
   const pathChanged = path !== lastPath;
   lastPath = path;
   detachSurveys();
+  const context = { site, client: auth.client, reload: loadPrivate };
 
   if (parts.length === 0) {
     show(meetingsView(site), 'meetings');
@@ -61,12 +84,16 @@ function route() {
     if (!meeting) show(notFoundView('There is no meeting with this address.'), 'meetings');
     else if (!TABS.some((t) => t.id === tab)) show(notFoundView(), 'meetings');
     else {
-      show(meetingView(meeting, tab), 'meetings');
+      show(meetingView(meeting, tab, undefined, { organizer: site.me?.organizer === true }), 'meetings');
       if (tab === 'pre') attachSurveys(main, meeting, site.backend);
+      if (site.private) attachPublish(main, context);
     }
   } else if (parts[0] === 'decisions' && parts.length === 1) {
     show(decisionsView(site, params.get('q') ?? ''), 'decisions');
     wireDecisionSearch();
+  } else if (parts[0] === 'team' && parts.length === 1 && site.private) {
+    show(teamView(site), 'team');
+    attachTeam(main, context);
   } else {
     show(notFoundView(), null);
   }
@@ -102,6 +129,43 @@ function wireDecisionSearch() {
   });
 }
 
+/** Private courses: (re)load the content from the database and redraw. */
+async function loadPrivate() {
+  const mine = ++loadGeneration;
+  const { client } = auth;
+  if (!client) return;
+  let answer;
+  try {
+    const { createMarkdown } = await import('./markdown.js');
+    answer = await client.rpc('get_course', { p_course: config.backend.course_id });
+    if (answer.error) throw new Error(answer.error.message);
+    if (mine !== loadGeneration) return; // signed out (or reloaded) meanwhile
+    site = toSite(answer.data, { createMarkdown, engine: config.engine, backend: config.backend });
+    loadError = null;
+  } catch (err) {
+    if (mine !== loadGeneration) return;
+    site = null;
+    loadError = `Couldn’t load the meetings: ${err.message}`;
+  }
+  lastPath = null;
+  route();
+}
+
+function followAuth(state) {
+  const before = auth;
+  auth = state;
+  document.querySelector('[data-nav="team"]').hidden = state.status !== 'member';
+  if (state.status === 'member') {
+    if (!site || before.login !== state.login || before.client !== state.client) loadPrivate();
+  } else {
+    // Signed out or not on the team: forget the content.
+    loadGeneration += 1;
+    site = null;
+    loadError = null;
+    route();
+  }
+}
+
 async function start() {
   // Back from GitHub sign-in? Restore the page first, so it is what gets drawn.
   const redirect = takeAuthRedirect();
@@ -113,22 +177,24 @@ async function start() {
   try {
     const response = await fetch('data/site.json', { cache: 'no-cache' });
     if (!response.ok) throw new Error(`could not load site data (HTTP ${response.status})`);
-    site = await response.json();
+    config = await response.json();
+    if (!config.private) site = config;
   } catch (err) {
     show(errorView(err.message), null);
     return;
   }
   const footer = document.getElementById('footer-text');
-  footer.innerHTML = String(html`Built with <a href="https://github.com/ElisejOrsini/meeting-engine" rel="noopener">meeting-engine</a> v${site.engine.version}`);
+  footer.innerHTML = String(html`Built with <a href="https://github.com/ElisejOrsini/meeting-engine" rel="noopener">meeting-engine</a> v${config.engine.version}`);
   window.addEventListener('hashchange', route);
   // Start sign-in first: its first, synchronous step marks the state as
   // "loading", so the first page doesn't briefly say surveys are switched off.
-  const auth = site.backend && startAuth(site.backend, redirect, {
+  const signIn = config.backend && startAuth(config.backend, redirect, {
     accountEl: document.getElementById('account'),
     noticeEl: document.getElementById('site-notice'),
   });
+  if (config.private) onAuth(followAuth);
   route();
-  await auth;
+  await signIn;
 }
 
 start();

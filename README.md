@@ -17,6 +17,13 @@ course's team list can sign in; the list lives in the course repository.
 Answering is optional; others' answers are shown on request (or only after
 answering), with names or anonymously, and deleted 30 days after the meeting.
 
+**Private courses** (new in v0.5.0): the meetings, the team list and survey
+answers live only in the database, and only signed-in team members can read
+them; the course's repository just configures the website. An AI agent can
+run meetings through its own key ([agent API](docs/agent-api.md)). Setup:
+[docs/private-course.md](docs/private-course.md); design:
+[docs/architecture.md](docs/architecture.md).
+
 **Demo:** https://elisejorsini.github.io/meeting-engine/ (made-up example course;
 sign-in only works for the demo's own team list)
 
@@ -36,7 +43,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 - On every push, GitHub Actions builds the site and publishes it on
   GitHub Pages. No server is needed.
 - Course repos use the engine at a pinned version
-  (`uses: ElisejOrsini/meeting-engine@v0.4.0`). To give a course a newer
+  (`uses: ElisejOrsini/meeting-engine@v0.5.0`). To give a course a newer
   engine, change the version in its workflow (in every `uses:` line of the
   engine, if there are several).
 - The permanent record (summaries and decisions) always lives in git.
@@ -52,9 +59,15 @@ meeting-engine (this repo, public)          course repo (one per course)
 | 1 | Static site: meetings from content files, three tabs, Decisions page, deployed to Pages | done |
 | 2 | Backend (Supabase) + GitHub login + allowlist, enforced server-side; tried on the demo site | done (v0.2.0) |
 | 3 | Survey answers (answering is optional; others' answers revealed on request, or only after answering; names or anonymous; deleted after 30 days) | done (v0.3.0) |
-| 4 | Course template (in this repo) + step-by-step guide; first real course site online | in progress |
-| 5 | Live in-meeting notes | later, optional |
-| 6 | Agent automation (e.g. an OpenClaw agent turning transcripts into summaries) | later, optional |
+| 4 | Course template (in this repo) + step-by-step guide | done (v0.4.0) |
+| 5 | Private courses: content in the database, organizers, Team page, drafts, versions, agent keys, import tool | done (v0.5.0) |
+| 6 | Agent API v1: survey results for the agent, vote snapshots, history on the site | next |
+| 7 | Scheduling grid (when2meet-style) | planned |
+| 8 | In-meeting tab redesign | planned |
+| 9 | Post-meeting: next steps, still open, Decisions page | planned |
+| 10 | Backups (nightly export) and clean-up | planned |
+
+The plan and its reasons: [docs/architecture.md](docs/architecture.md).
 
 Until milestone 6, meetings are maintained by hand, with help from Claude Code
 if you like: add a meeting folder, and after the meeting write `summary.md` and
@@ -77,6 +90,8 @@ npm install        # once
 npm run dev        # preview the demo at http://localhost:4321 (reload to rebuild)
 npm run dev:mock   # the same with a pretend backend at http://localhost:4322:
                    # sign in and answer surveys without a real sign-in
+npm run dev:private  # a private course at http://localhost:4323, with the real
+                   # database setup running in memory (demo content imported)
 npm run check      # validate the demo content
 npm test           # run the tests
 npm run build      # build the demo into _site/
@@ -94,6 +109,10 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 | `src/` | The website (plain HTML, CSS and JavaScript, no framework) |
 | `demo/` | Made-up example course, published as this repo's own Pages site |
 | `templates/course/` | Starting point for a new course repository ([guide](docs/new-course.md)) |
+| `templates/private-course/` | Starting point for a private course's repository ([guide](docs/private-course.md)) |
+| `scripts/import.mjs` | Imports a content folder into a private course through the agent API |
+| `scripts/local-backend.mjs`, `scripts/local-supabase.js` | The in-memory database behind `npm run dev:private` (never used on real sites) |
+| `demo-private/` | Settings of the private preview course |
 | `docs/content-format.md` | Reference for every content file and option |
 | `docs/backend-setup.md` | Sign-in setup, click by click |
 | `docs/new-course.md` | Setting up a new course site, click by click |
@@ -151,7 +170,7 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 2. Make the change, run `npm test`, push to `main`, and check the demo site.
 3. In one commit, update `version` in `package.json`, every version in
    `templates/course/` (`npm test` checks them) and the docs' snippets. Push,
-   then tag it, e.g. `git tag v0.4.0 && git push origin v0.4.0`.
+   then tag it, e.g. `git tag v0.5.0 && git push origin v0.5.0`.
 4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
 

@@ -58,7 +58,7 @@ decisions:
 ```
 
 The full format, with every option, is in the engine's
-[content format reference](https://github.com/ElisejOrsini/meeting-engine/blob/v0.4.0/docs/content-format.md).
+[content format reference](https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.0/docs/content-format.md).
 
 ## Checking and previewing before you push
 
@@ -79,7 +79,7 @@ checked out there, which can be newer than the one this site pins.
 
 ## Engine version
 
-`.github/workflows/deploy.yml` pins the engine (`@v0.4.0`). To update, change
+`.github/workflows/deploy.yml` pins the engine (`@v0.5.0`). To update, change
 every `ElisejOrsini/meeting-engine…@` version in that file to the same new
 version and push. If the new version's release notes add a database file,
 run it in Supabase first.
@@ -94,7 +94,7 @@ own organization or a custom domain.
 ## Sign-in and survey answers
 
 Set up once with the engine's
-[backend setup guide](https://github.com/ElisejOrsini/meeting-engine/blob/v0.4.0/docs/backend-setup.md):
+[backend setup guide](https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.0/docs/backend-setup.md):
 `backend:` and `members:` in `course.yml`, the `supabase-url` in the deploy
 workflow, and the `SUPABASE_SECRET_KEY` secret in the `github-pages`
 environment (Settings → Environments).

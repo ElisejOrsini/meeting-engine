@@ -699,3 +699,62 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   .button, .tabs a[aria-current="page"], .badge { border: 1px solid ButtonText; }
   .tally-bar > span { background: Highlight; }
 }
+
+/* ---------- private courses: drafts, notes, next steps, Team page ---------- */
+.badge-draft { background: var(--orange-tint); color: var(--orange); }
+.notice-draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 24px;
+  background: var(--orange-tint);
+}
+.notice-draft p { margin: 0; flex: 1 1 260px; }
+.saved-line { margin: 24px 0 0; }
+.course-notes > summary { cursor: pointer; list-style: none; }
+.course-notes > summary::-webkit-details-marker { display: none; }
+.course-notes > summary h2 { display: inline; }
+.course-notes > summary::after { content: " ›"; color: var(--text-3); font-size: 1.25rem; }
+.course-notes[open] > summary::after { content: " ⌄"; }
+.course-notes .prose { margin-top: 12px; }
+.next-step, .member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 14px 20px;
+  min-height: 52px;
+}
+.next-step-what { flex: 1; min-width: 0; }
+.member .row-meta { max-width: 60%; }
+.link-danger { color: var(--orange); }
+.team-form {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+.team-form input:not([type]), .team-form input[type="text"] {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  width: 100%;
+  max-width: 360px;
+}
+.team-form .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+.new-key { margin-top: 16px; }
+.key-value {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  word-break: break-all;
+  user-select: all;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+.team-form[hidden] { display: none; }

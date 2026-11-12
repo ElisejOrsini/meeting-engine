@@ -1,7 +1,7 @@
 # Builds this course's meeting site with meeting-engine and publishes it on
 # GitHub Pages, on every push to main.
 #
-# Engine version: every "ElisejOrsini/meeting-engine...@v0.4.0" below must
+# Engine version: every "ElisejOrsini/meeting-engine...@v0.5.0" below must
 # have the same version. To get a newer engine (e.g. a new design), change
 # all of them and push.
 name: Deploy site
@@ -27,7 +27,7 @@ jobs:
           persist-credentials: false
 
       - name: Build the site
-        uses: ElisejOrsini/meeting-engine@v0.4.0
+        uses: ElisejOrsini/meeting-engine@v0.5.0
         with:
           content-dir: .
           out-dir: _site
@@ -57,7 +57,7 @@ jobs:
       # Copies the team list and survey settings to Supabase. Until course.yml
       # has a backend: section, it only says "nothing to do".
       - name: Copy team list and survey settings to the backend
-        uses: ElisejOrsini/meeting-engine/sync@v0.4.0
+        uses: ElisejOrsini/meeting-engine/sync@v0.5.0
         with:
           supabase-url: https://REPLACE-WITH-PROJECT-URL.supabase.co # your Project URL (same as in course.yml)
           supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}

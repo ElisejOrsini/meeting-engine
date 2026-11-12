@@ -18,6 +18,15 @@
         "dev:mock"
       ],
       "port": 4322
+    },
+    {
+      "name": "private-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:private"
+      ],
+      "port": 4323
     }
   ]
 }

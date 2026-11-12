@@ -2,26 +2,39 @@
 // Local preview: rebuilds the site whenever a page is (re)loaded, then serves it.
 //
 //   node scripts/dev-server.mjs --content demo [--port 4321] [--mock-backend]
+//   node scripts/dev-server.mjs --content demo-private --local-backend [--import demo]
 //
 // --mock-backend replaces the Supabase client with scripts/mock-supabase.js:
 // sign-in and survey answers are simulated in the browser, so they can be
 // tried without a real sign-in.
+//
+// --local-backend is for private courses (course.yml: private: true): it runs
+// the real database setup in a local, in-memory database (scripts/local-backend.mjs),
+// and the site talks to it instead of Supabase, with pretend sign-in
+// (scripts/local-supabase.js). --import <folder> first imports a content
+// folder through the agent API, and publishes its meetings. Nothing is saved:
+// restarting the server starts from scratch.
 
 import { createServer } from 'node:http';
-import { copyFile, readFile, stat } from 'node:fs/promises';
+import { copyFile, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { build } from '../build/build.mjs';
 import { escapeHtml } from '../build/markdown.mjs';
+import { loadContent } from '../build/content.mjs';
+import { createLocalBackend } from './local-backend.mjs';
 
 const { values } = parseArgs({
   options: {
     content: { type: 'string', default: 'demo' },
     port: { type: 'string', default: '4321' },
     'mock-backend': { type: 'boolean', default: false },
+    'local-backend': { type: 'boolean', default: false },
+    import: { type: 'string' },
   },
 });
+const ORIGIN = `http://localhost:${values.port}`;
 
 const ENGINE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // One build folder per port, so two previews (e.g. with and without the mock
@@ -62,6 +75,17 @@ function rebuild() {
       if (result.ok && values['mock-backend'] && result.site.backend) {
         await copyFile(path.join(ENGINE_ROOT, 'scripts', 'mock-supabase.js'), path.join(OUT, 'vendor', 'supabase.js'));
       }
+      if (result.ok && localBackend) {
+        // Point the site at the local backend (this server) instead of Supabase.
+        await copyFile(path.join(ENGINE_ROOT, 'scripts', 'local-supabase.js'), path.join(OUT, 'vendor', 'supabase.js'));
+        const siteFile = path.join(OUT, 'data', 'site.json');
+        const site = JSON.parse(await readFile(siteFile, 'utf8'));
+        const realUrl = site.backend.url;
+        site.backend.url = ORIGIN;
+        await writeFile(siteFile, JSON.stringify(site));
+        const indexFile = path.join(OUT, 'index.html');
+        await writeFile(indexFile, (await readFile(indexFile, 'utf8')).replaceAll(realUrl, ORIGIN));
+      }
       return { ok: result.ok, errors };
     } catch (err) {
       return { ok: false, errors: [String(err?.stack ?? err)] };
@@ -70,6 +94,22 @@ function rebuild() {
     }
   })();
   return running;
+}
+
+let localBackend = null;
+if (values['local-backend']) {
+  const content = await loadContent(values.content);
+  if (!content.site.private) {
+    console.error('--local-backend needs a private course (course.yml: private: true), e.g. --content demo-private');
+    process.exit(2);
+  }
+  console.log('Starting the local backend (the real database setup, in memory)…');
+  localBackend = await createLocalBackend({
+    courseId: content.site.backend.course_id,
+    courseName: content.site.course.name,
+    siteUrl: `${ORIGIN}/`,
+    importFrom: values.import,
+  });
 }
 
 const server = createServer(async (req, res) => {
@@ -85,6 +125,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(400).end('Bad request');
     return;
   }
+  if (localBackend && await localBackend.handle(req, res, pathname)) return;
   if (pathname.endsWith('/')) pathname += 'index.html';
 
   if (pathname === '/index.html') {
@@ -118,4 +159,8 @@ const server = createServer(async (req, res) => {
 server.listen(Number(values.port), '127.0.0.1', () => {
   console.log(`Preview: http://localhost:${values.port}/  (reload the page to rebuild)`);
   if (values['mock-backend']) console.log('Mock backend: sign-in and survey answers are simulated in this browser.');
+  if (localBackend) {
+    console.log('Local backend: "Sign in" signs you in as you-in-preview (organizer). To be someone else, run in the');
+    console.log('browser console: localStorage.setItem("meeting-engine-local-user", "1002") (teammate) or "4001" (stranger).');
+  }
 });

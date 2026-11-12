@@ -167,6 +167,9 @@ export async function run(command, { contentDir, env = process.env, fetch = glob
   }
   const { backend } = content.site;
   if (!backend) return ['course.yml has no backend section; nothing to do.'];
+  if (content.site.private && command === 'sync') {
+    return ['This is a private course: its team list and meetings are managed on the site; nothing to copy.'];
+  }
 
   if (command === 'keepalive') {
     const at = await callRpc(backend.url, backend.publishable_key, 'keepalive', {}, fetch);

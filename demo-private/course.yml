@@ -1,0 +1,9 @@
+# A private course, for local previews of the private mode only
+# (npm run dev:private). Its content is imported from demo/ into a local
+# database when the preview starts; nothing here talks to a real backend.
+name: "Applied Widgetry (private preview)"
+private: true
+backend:
+  url: https://aaaaaaaaaaaaaaaaaaaa.supabase.co   # replaced by the local backend
+  publishable_key: sb_publishable_local_preview_only
+  course_id: widgetry-preview

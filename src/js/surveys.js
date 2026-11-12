@@ -17,6 +17,7 @@ export const KEEP_DAYS = 30;
 
 /** Have this meeting's answers been deleted (30 days after the meeting)? */
 export function answersExpired(date, today = localToday()) {
+  if (!date) return false; // no time set yet
   const until = new Date(`${date}T00:00:00Z`);
   until.setUTCDate(until.getUTCDate() + KEEP_DAYS);
   return until.toISOString().slice(0, 10) < today;

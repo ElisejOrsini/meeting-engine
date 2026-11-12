@@ -12,6 +12,7 @@ import { build } from '../build/build.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATE = path.join(ROOT, 'templates', 'course');
+const PRIVATE_TEMPLATE = path.join(ROOT, 'templates', 'private-course');
 const quiet = { log() {}, warn() {}, error() {} };
 
 async function filesIn(dir) {
@@ -56,7 +57,7 @@ test('templates: the course template builds, and its meeting template is valid o
 test('templates: every engine version in the template is the current one', async () => {
   const { version } = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
   const found = [];
-  for (const file of await filesIn(TEMPLATE)) {
+  for (const file of [...await filesIn(TEMPLATE), ...await filesIn(PRIVATE_TEMPLATE)]) {
     const text = await readFile(file, 'utf8');
     // Any version number at all (pins, doc links, comments).
     for (const m of text.matchAll(/\bv\d+\.\d+\.\d+\b/g)) {
@@ -81,4 +82,29 @@ test('templates: only the main-only deploy job can use the secret key', async ()
   assert.equal(sync.with['supabase-secret-key'], '${{ secrets.SUPABASE_SECRET_KEY }}');
   assert.ok(deploy.steps.indexOf(sync) < deploy.steps.findIndex((s) => String(s.uses ?? '').startsWith('actions/deploy-pages')),
     'the team list is copied before the site is published');
+});
+
+test('templates: the private course template is an empty shell with placeholders and no secrets', async () => {
+  const result = await loadContent(PRIVATE_TEMPLATE);
+  const problems = result.errors.join('\n');
+  for (const key of ['backend.url', 'publishable_key', 'backend.course_id']) {
+    assert.ok(problems.includes(key), `placeholder ${key} must be refused:\n${problems}`);
+  }
+  const raw = await readFile(path.join(PRIVATE_TEMPLATE, 'course.yml'), 'utf8');
+  const filled = raw
+    .replace('https://REPLACE-WITH-PROJECT-URL.supabase.co', 'https://abcdefghijklmnopqrst.supabase.co')
+    .replace('REPLACE_WITH_PUBLISHABLE_KEY', 'sb_publishable_abcdefghijkl')
+    .replace('REPLACE_WITH_COURSE_ID', 'widgetry-2026')
+    .replace('REPLACE_WITH_COURSE_NAME', 'Widgetry');
+  const dir = await mkdtemp(path.join(tmpdir(), 'meeting-engine-private-template-'));
+  await cp(PRIVATE_TEMPLATE, dir, { recursive: true });
+  await writeFile(path.join(dir, 'course.yml'), filled);
+  const ok = await loadContent(dir);
+  assert.deepEqual(ok.errors, []);
+  assert.equal(ok.site.private, true);
+  assert.equal((await build({ contentDir: dir, outDir: path.join(dir, '_site'), log: quiet })).ok, true);
+
+  const workflow = load(await readFile(path.join(PRIVATE_TEMPLATE, '.github', 'workflows', 'deploy.yml'), 'utf8'), { schema: CORE_SCHEMA });
+  assert.ok(!JSON.stringify(workflow).includes('secrets.'), 'a private course site needs no secrets');
+  assert.ok(!JSON.stringify(workflow).includes('meeting-engine/sync@'), 'nothing to copy to the backend');
 });

@@ -253,7 +253,7 @@ function checker(problems, file, where) {
 }
 
 const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [] };
-const NO_COURSE = { course: DEFAULT_COURSE, backend: null, members: [] };
+const NO_COURSE = { course: DEFAULT_COURSE, backend: null, members: [], isPrivate: false };
 
 /** The optional `backend:` section: where sign-in and survey answers live. */
 function loadBackend(raw, file, problems) {
@@ -319,11 +319,22 @@ function loadCourse(raw, file, problems) {
     return NO_COURSE;
   }
   const c = checker(problems, file, '');
-  c.keys(raw, ['name', 'description', 'links', 'backend', 'members']);
+  c.keys(raw, ['name', 'description', 'links', 'backend', 'members', 'private']);
   const backend = loadBackend(raw.backend, file, problems);
-  const memberList = c.list(raw, 'members');
+  const isPrivate = raw.private === true;
+  if (raw.private !== undefined && typeof raw.private !== 'boolean') {
+    problems.error(file, '"private" must be true or false');
+  }
+  if (isPrivate && !raw.backend) {
+    problems.error(file, '"private: true" needs a "backend" section: the content lives in that database');
+  }
+  if (isPrivate && raw.members !== undefined) {
+    problems.error(file, '"members" is not used by a private course: organizers manage the team on the site\'s Team page; '
+      + 'remove the list (it would be public here)');
+  }
+  const memberList = isPrivate ? [] : c.list(raw, 'members');
   const members = loadMembers(memberList, file, problems);
-  if (raw.backend && !memberList.length) {
+  if (raw.backend && !isPrivate && !memberList.length) {
     problems.warn(file, 'nobody can sign in yet: add the team\'s GitHub usernames under "members"');
   }
   if (!raw.backend && members.length) {
@@ -349,12 +360,13 @@ function loadCourse(raw, file, problems) {
   for (const { href } of md.fileLinks) problems.error(file, `description links to "${href}"; use a full https:// address`);
   return {
     course: {
-      name: c.string(raw, 'name', { required: true }) ?? DEFAULT_COURSE.name,
+      name: c.string(raw, 'name', { required: !isPrivate }) ?? DEFAULT_COURSE.name,
       description_html: descriptionHtml,
       links,
     },
     backend,
     members,
+    isPrivate,
   };
 }
 
@@ -596,13 +608,20 @@ export async function loadContent(contentDir, { engineVersion = '0.0.0' } = {}) 
   const root = path.resolve(contentDir);
   const problems = new Problems(root);
   const courseFile = path.join(root, 'course.yml');
-  const { course, backend, members } = loadCourse(await readYaml(courseFile, problems), courseFile, problems);
+  const { course, backend, members, isPrivate } = loadCourse(await readYaml(courseFile, problems), courseFile, problems);
 
   const meetingsDir = path.join(root, 'meetings');
   const meetings = [];
   const assets = [];
   const kind = await kindOf(meetingsDir);
-  if (kind !== 'dir') {
+  if (isPrivate) {
+    // A private course's repository only configures the website; its content
+    // lives in the database. Content here would be published with the site.
+    if (kind !== null) {
+      problems.error(meetingsDir, 'a private course keeps its meetings in the database, not in the repository: '
+        + 'import them (scripts/import.mjs, see docs/private-course.md), then delete this folder');
+    }
+  } else if (kind !== 'dir') {
     problems.error(meetingsDir, kind === null ? 'missing meetings/ folder' : 'meetings must be a normal folder');
   } else {
     for (const entry of await readdir(meetingsDir, { withFileTypes: true })) {
@@ -633,7 +652,7 @@ export async function loadContent(contentDir, { engineVersion = '0.0.0' } = {}) 
   return {
     // site becomes data/site.json (public). The member list is not in it:
     // the website doesn't need it, and the deploy workflow sends it to the backend.
-    site: { engine: { version: engineVersion }, course, backend, meetings },
+    site: { engine: { version: engineVersion }, course, backend, ...(isPrivate ? { private: true } : {}), meetings },
     members,
     errors: problems.errors,
     warnings: problems.warnings,

@@ -21,9 +21,13 @@ const SRC_DIR = path.join(ENGINE_ROOT, 'src');
 const OUTPUT_MARKER = '.meeting-engine-output';
 const require = createRequire(import.meta.url);
 
-/** The Content-Security-Policy connect-src: the site itself, plus the backend if there is one. */
-export function connectSrc(backend) {
-  return backend ? `'self' ${backend.url}` : `'self'`;
+/**
+ * The Content-Security-Policy connect-src: the site itself, plus the backend
+ * if there is one; private courses also look up GitHub usernames (Team page).
+ */
+export function connectSrc(backend, { isPrivate = false } = {}) {
+  if (!backend) return `'self'`;
+  return isPrivate ? `'self' ${backend.url} https://api.github.com` : `'self' ${backend.url}`;
 }
 
 export async function engineVersion() {
@@ -102,7 +106,7 @@ export async function build({ contentDir, outDir, check = false, log = console }
   // Replacer functions, so "$&" etc. in the name are not treated as patterns.
   await writeFile(indexFile, index
     .replaceAll('{{COURSE_NAME}}', () => courseName)
-    .replaceAll('{{CONNECT_SRC}}', () => connectSrc(result.site.backend))); // URL checked by the loader
+    .replaceAll('{{CONNECT_SRC}}', () => connectSrc(result.site.backend, { isPrivate: result.site.private }))); // URL checked by the loader
 
   if (result.site.backend) {
     // The Supabase browser client (pinned in package.json), served from the
@@ -112,6 +116,20 @@ export async function build({ contentDir, outDir, check = false, log = console }
     await cp(client, path.join(out, 'vendor', 'supabase.js'));
     await cp(path.join(path.dirname(require.resolve('@supabase/supabase-js/package.json')), 'LICENSE'),
       path.join(out, 'vendor', 'supabase.LICENSE.txt'));
+  }
+
+  if (result.site.private) {
+    // Private courses render Markdown in the browser, with the same renderer
+    // and safety rules the build uses (build/markdown.mjs), and the same
+    // pinned version of marked, served from the site itself.
+    const markdown = await readFile(path.join(ENGINE_ROOT, 'build', 'markdown.mjs'), 'utf8');
+    const browserMarkdown = markdown.replace("from 'marked';", "from '../vendor/marked.esm.js';");
+    if (browserMarkdown === markdown) throw new Error('build/markdown.mjs: could not point the marked import at vendor/');
+    await writeFile(path.join(out, 'js', 'markdown.js'), browserMarkdown);
+    const markedDir = path.dirname(require.resolve('marked/package.json'));
+    await mkdir(path.join(out, 'vendor'), { recursive: true });
+    await cp(path.join(markedDir, 'lib', 'marked.esm.js'), path.join(out, 'vendor', 'marked.esm.js'));
+    await cp(path.join(markedDir, 'LICENSE'), path.join(out, 'vendor', 'marked.LICENSE.txt'));
   }
 
   await mkdir(path.join(out, 'data'), { recursive: true });
