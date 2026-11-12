@@ -758,3 +758,4 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   border-radius: 8px;
 }
 .team-form[hidden] { display: none; }
+.site-nav .home-link { color: var(--accent); }

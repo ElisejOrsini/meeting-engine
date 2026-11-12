@@ -1,7 +1,7 @@
 # Builds this team's private meeting site (the website only, no content) with
 # meeting-engine and publishes it on GitHub Pages, on every push to main.
 #
-# Engine version: change "@v0.5.0" below to get a newer engine, then push.
+# Engine version: change "@v0.5.1" below to get a newer engine, then push.
 # No secrets are needed: the content is loaded after sign-in.
 name: Deploy site
 
@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Build the site
-        uses: ElisejOrsini/meeting-engine@v0.5.0
+        uses: ElisejOrsini/meeting-engine@v0.5.1
         with:
           content-dir: .
           out-dir: _site

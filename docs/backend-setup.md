@@ -144,7 +144,7 @@ Do this before step 8: until
 
 In `.github/workflows/deploy.yml`:
 
-1. Change the build step to `uses: ElisejOrsini/meeting-engine@v0.5.0`.
+1. Change the build step to `uses: ElisejOrsini/meeting-engine@v0.5.1`.
 2. Replace the whole `deploy:` job with the one below. Put your Project URL in
    `supabase-url`.
 
@@ -166,7 +166,7 @@ Both `uses:` lines of the engine must have the same version.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine/sync@v0.5.0
+      - uses: ElisejOrsini/meeting-engine/sync@v0.5.1
         with:
           supabase-url: https://abcdefghijklmnopqrst.supabase.co   # your Project URL
           supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -242,7 +242,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ElisejOrsini/meeting-engine/keepalive@v0.5.0
+      - uses: ElisejOrsini/meeting-engine/keepalive@v0.5.1
 ```
 
 - If the project was paused anyway, the workflow fails and GitHub emails you.

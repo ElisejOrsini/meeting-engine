@@ -14,6 +14,10 @@
 // (scripts/local-supabase.js). --import <folder> first imports a content
 // folder through the agent API, and publishes its meetings. Nothing is saved:
 // restarting the server starts from scratch.
+//
+// --hub <folder> --base <path> preview a site that has other pages next to the
+// meeting site (like AIP-PAGE): files from <folder> are served at /, and the
+// meeting site at /<path>/.
 
 import { createServer } from 'node:http';
 import { copyFile, readFile, stat, writeFile } from 'node:fs/promises';
@@ -32,8 +36,12 @@ const { values } = parseArgs({
     'mock-backend': { type: 'boolean', default: false },
     'local-backend': { type: 'boolean', default: false },
     import: { type: 'string' },
+    hub: { type: 'string' },
+    base: { type: 'string', default: '' },
   },
 });
+const BASE = values.base.replace(/^\/+|\/+$/g, '');
+const SITE_PREFIX = BASE ? `/${BASE}/` : '/';
 const ORIGIN = `http://localhost:${values.port}`;
 
 const ENGINE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,7 +115,7 @@ if (values['local-backend']) {
   localBackend = await createLocalBackend({
     courseId: content.site.backend.course_id,
     courseName: content.site.course.name,
-    siteUrl: `${ORIGIN}/`,
+    siteUrl: `${ORIGIN}${SITE_PREFIX}`,
     importFrom: values.import,
   });
 }
@@ -126,9 +134,19 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (localBackend && await localBackend.handle(req, res, pathname)) return;
+  if (BASE && pathname === `/${BASE}`) {
+    res.writeHead(301, { location: SITE_PREFIX }).end();
+    return;
+  }
   if (pathname.endsWith('/')) pathname += 'index.html';
+  let root = OUT;
+  if (values.hub && !pathname.startsWith(SITE_PREFIX)) {
+    root = path.resolve(values.hub);
+  } else if (BASE) {
+    pathname = pathname.slice(SITE_PREFIX.length - 1);
+  }
 
-  if (pathname === '/index.html') {
+  if (root === OUT && pathname === '/index.html') {
     const { ok, errors } = await rebuild();
     if (!ok) {
       res.writeHead(500, { 'content-type': TYPES['.html'] });
@@ -137,8 +155,8 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  const file = path.join(OUT, pathname);
-  if (!file.startsWith(OUT + path.sep)) {
+  const file = path.join(root, pathname);
+  if (!file.startsWith(root + path.sep)) {
     res.writeHead(403).end('Forbidden');
     return;
   }
@@ -157,7 +175,8 @@ const server = createServer(async (req, res) => {
 
 // 127.0.0.1: reachable only from this computer, not from the network.
 server.listen(Number(values.port), '127.0.0.1', () => {
-  console.log(`Preview: http://localhost:${values.port}/  (reload the page to rebuild)`);
+  console.log(`Preview: http://localhost:${values.port}${SITE_PREFIX}  (reload the page to rebuild)`);
+  if (values.hub) console.log(`Hub: http://localhost:${values.port}/ (from ${values.hub})`);
   if (values['mock-backend']) console.log('Mock backend: sign-in and survey answers are simulated in this browser.');
   if (localBackend) {
     console.log('Local backend: "Sign in" signs you in as you-in-preview (organizer). To be someone else, run in the');

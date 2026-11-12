@@ -1,7 +1,7 @@
 # Team meetings (private)
 
 This repository publishes the team's meeting website with
-[meeting-engine](https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.0/docs/private-course.md).
+[meeting-engine](https://github.com/ElisejOrsini/meeting-engine/blob/v0.5.1/docs/private-course.md).
 It holds **no meeting content**: meetings, the team list and survey answers
 live in the database, and only signed-in team members can see them.
 

@@ -30,6 +30,12 @@ export function connectSrc(backend, { isPrivate = false } = {}) {
   return isPrivate ? `'self' ${backend.url} https://api.github.com` : `'self' ${backend.url}`;
 }
 
+/** The optional "home" link at the start of the header's navigation (course.yml: home). */
+export function homeLink(home) {
+  if (!home) return '';
+  return `<a href="${escapeHtml(home.url)}" class="home-link"><span aria-hidden="true">‹ </span>${escapeHtml(home.title)}</a>`;
+}
+
 export async function engineVersion() {
   const pkg = JSON.parse(await readFile(path.join(ENGINE_ROOT, 'package.json'), 'utf8'));
   return pkg.version;
@@ -106,7 +112,8 @@ export async function build({ contentDir, outDir, check = false, log = console }
   // Replacer functions, so "$&" etc. in the name are not treated as patterns.
   await writeFile(indexFile, index
     .replaceAll('{{COURSE_NAME}}', () => courseName)
-    .replaceAll('{{CONNECT_SRC}}', () => connectSrc(result.site.backend, { isPrivate: result.site.private }))); // URL checked by the loader
+    .replaceAll('{{CONNECT_SRC}}', () => connectSrc(result.site.backend, { isPrivate: result.site.private })) // URL checked by the loader
+    .replaceAll('{{HOME_LINK}}', () => homeLink(result.site.course.home)));
 
   if (result.site.backend) {
     // The Supabase browser client (pinned in package.json), served from the

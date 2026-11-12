@@ -252,7 +252,9 @@ function checker(problems, file, where) {
   };
 }
 
-const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [] };
+const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [], home: null };
+// home.url: a full https:// address, or a path on the same website ("../", "/AIP-PAGE/").
+const HOME_URL_PATTERN = /^(https:\/\/[^\s"'<>\\]+|(\.\.\/|\.\/|\/)[^\s"'<>\\]*|\.\.)$/;
 const NO_COURSE = { course: DEFAULT_COURSE, backend: null, members: [], isPrivate: false };
 
 /** The optional `backend:` section: where sign-in and survey answers live. */
@@ -319,7 +321,7 @@ function loadCourse(raw, file, problems) {
     return NO_COURSE;
   }
   const c = checker(problems, file, '');
-  c.keys(raw, ['name', 'description', 'links', 'backend', 'members', 'private']);
+  c.keys(raw, ['name', 'description', 'links', 'home', 'backend', 'members', 'private']);
   const backend = loadBackend(raw.backend, file, problems);
   const isPrivate = raw.private === true;
   if (raw.private !== undefined && typeof raw.private !== 'boolean') {
@@ -357,12 +359,29 @@ function loadCourse(raw, file, problems) {
     return title && url ? { title, url } : null;
   }).filter(Boolean);
   const descriptionHtml = md.block(c.string(raw, 'description'), { headingOffset: 1, source: 'course.yml' });
+  let home = null;
+  if (raw.home !== undefined && raw.home !== null) {
+    if (!isObject(raw.home)) {
+      problems.error(file, '"home" must have "title" and "url"');
+    } else {
+      const hc = checker(problems, file, 'home');
+      hc.keys(raw.home, ['title', 'url']);
+      const title = hc.string(raw.home, 'title', { required: true });
+      const url = hc.string(raw.home, 'url', {
+        required: true,
+        pattern: HOME_URL_PATTERN,
+        patternHint: 'must start with https:// or be a path on the same website, like ../',
+      });
+      if (title && url) home = { title, url };
+    }
+  }
   for (const { href } of md.fileLinks) problems.error(file, `description links to "${href}"; use a full https:// address`);
   return {
     course: {
       name: c.string(raw, 'name', { required: !isPrivate }) ?? DEFAULT_COURSE.name,
       description_html: descriptionHtml,
       links,
+      home,
     },
     backend,
     members,

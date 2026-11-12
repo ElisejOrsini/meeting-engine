@@ -133,3 +133,27 @@ test('build: a private course publishes an empty shell, and refuses meeting cont
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('build: course.yml "home" adds a link back to another site in the header', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'me-home-'));
+  const quiet = { log() {}, warn() {}, error() {} };
+  try {
+    const base = await readFile('demo-private/course.yml', 'utf8');
+    await writeFile(path.join(dir, 'course.yml'), `${base}home:\n  title: Public site\n  url: ../\n`);
+    const out = path.join(dir, '_site');
+    assert.equal((await build({ contentDir: dir, outDir: out, log: quiet })).ok, true);
+    assert.match(await readFile(path.join(out, 'index.html'), 'utf8'), /<a href="\.\.\/" class="home-link"><span aria-hidden="true">‹ <\/span>Public site<\/a>/);
+    for (const url of ['javascript:alert(1)', 'http://example.org', '"><script>']) {
+      await writeFile(path.join(dir, 'course.yml'), `${base}home:\n  title: X\n  url: '${url}'\n`);
+      const r = await build({ contentDir: dir, outDir: out, check: true, log: quiet });
+      assert.equal(r.ok, false, url);
+    }
+    // Without "home", no link (and no leftover placeholder).
+    await writeFile(path.join(dir, 'course.yml'), base);
+    await build({ contentDir: dir, outDir: out, log: quiet });
+    const index = await readFile(path.join(out, 'index.html'), 'utf8');
+    assert.doesNotMatch(index, /home-link|\{\{/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -6,7 +6,7 @@
 # github-pages only runs for the branch being deployed, so workflows on other
 # branches can't read the key. The full workflow is in docs/backend-setup.md.
 #
-#   - uses: ElisejOrsini/meeting-engine/sync@v0.5.0
+#   - uses: ElisejOrsini/meeting-engine/sync@v0.5.1
 #     with:
 #       supabase-url: https://abcdefghijklmnopqrst.supabase.co
 #       supabase-secret-key: ${{ secrets.SUPABASE_SECRET_KEY }}

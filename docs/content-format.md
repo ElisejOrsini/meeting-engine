@@ -55,6 +55,9 @@ description: |                    # optional, Markdown, shown on the start page
 links:                            # optional, shown on the start page
   - title: Course website         # required
     url: https://example.org      # required, https://, http:// or mailto:
+home:                             # optional, a link at the start of the header, on every page
+  title: Public site              # required
+  url: ../                        # required, https://… or a path on the same website (../, /…)
 
 backend:                          # optional: GitHub sign-in (and later survey answers)
   url: https://abcdefghijklmnopqrst.supabase.co   # required, the Supabase Project URL

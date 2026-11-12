@@ -43,7 +43,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 - On every push, GitHub Actions builds the site and publishes it on
   GitHub Pages. No server is needed.
 - Course repos use the engine at a pinned version
-  (`uses: ElisejOrsini/meeting-engine@v0.5.0`). To give a course a newer
+  (`uses: ElisejOrsini/meeting-engine@v0.5.1`). To give a course a newer
   engine, change the version in its workflow (in every `uses:` line of the
   engine, if there are several).
 - The permanent record (summaries and decisions) always lives in git.
@@ -170,7 +170,7 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 2. Make the change, run `npm test`, push to `main`, and check the demo site.
 3. In one commit, update `version` in `package.json`, every version in
    `templates/course/` (`npm test` checks them) and the docs' snippets. Push,
-   then tag it, e.g. `git tag v0.5.0 && git push origin v0.5.0`.
+   then tag it, e.g. `git tag v0.5.1 && git push origin v0.5.1`.
 4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
 
