@@ -23,6 +23,12 @@ export function answersExpired(date, today = localToday()) {
   return until.toISOString().slice(0, 10) < today;
 }
 
+// Skipping a question: stored as an empty answer (a real answer never is).
+const SKIP = 'skip';
+export function isSkip(row) {
+  return Boolean(row?.answer) && typeof row.answer === 'object' && Object.keys(row.answer).length === 0;
+}
+
 function who(row) {
   return row.mine ? 'you' : row.github_login ?? null;
 }
@@ -57,6 +63,7 @@ function plural(n, word) {
 }
 
 function resultsView(question, rows) {
+  rows = rows.filter((r) => !isSkip(r)); // your own skip isn't a response
   const t = tally(question, rows);
   const heading = `responses-${question.id}`;
   const fieldView = (f) => {
@@ -207,9 +214,10 @@ export function attachSurveys(root, meeting, backend) {
       // The question card: status and the buttons that open the sheet.
       const card = actionsFor(id);
       if (card) {
-        const answered = active && mine.has(id);
+        const skipped = active && isSkip(mine.get(id));
+        const answered = active && mine.has(id) && !skipped;
         const status = card.querySelector('.question-status');
-        status.textContent = answered ? 'Answered' : '';
+        status.textContent = answered ? 'Answered' : skipped ? 'Skipped' : '';
         status.classList.toggle('is-answered', answered);
         const canAnswer = !expired && ['member', 'signed-out', 'loading'].includes(auth.status);
         card.querySelector('[data-action="open"]').textContent = answered ? 'Edit answer' : canAnswer ? 'Answer' : 'View survey';
@@ -219,7 +227,10 @@ export function attachSurveys(root, meeting, backend) {
       if (signIn) signIn.hidden = auth.status !== 'signed-out' || expired;
       for (const input of form.querySelectorAll('input, textarea')) input.disabled = !active;
       form.querySelector('.survey-actions').hidden = !active;
-      form.querySelector('[data-action="clear"]').hidden = !mine.has(id);
+      const clear = form.querySelector('[data-action="clear"]');
+      clear.hidden = !mine.has(id);
+      clear.textContent = isSkip(mine.get(id)) ? 'Undo skip' : 'Remove my answer';
+      form.querySelector('[data-action="skip"]').hidden = isSkip(mine.get(id));
       const area = others(id);
       area.hidden = !active;
       const locked = meeting.reveal === 'after_answering' && !mine.has(id);
@@ -230,7 +241,7 @@ export function attachSurveys(root, meeting, backend) {
       const button = area.querySelector('[data-action="show"]');
       button.disabled = locked;
       button.textContent = shown.has(id) ? 'Refresh responses' : 'Show other responses';
-      area.querySelector('.survey-others-note').textContent = locked ? 'Answer this question to see the others’ responses.' : '';
+      area.querySelector('.survey-others-note').textContent = locked ? 'Answer or skip this question to see the others’ responses.' : '';
     }
   }
 
@@ -266,7 +277,7 @@ export function attachSurveys(root, meeting, backend) {
       for (const form of forms) {
         const row = mine.get(form.dataset.question);
         fill(form, questions.get(form.dataset.question), row?.answer);
-        if (row) setStatus(form, `You answered on ${formatTime(row.updated_at)}.`);
+        if (row) setStatus(form, isSkip(row) ? `You skipped this on ${formatTime(row.updated_at)}.` : `You answered on ${formatTime(row.updated_at)}.`);
       }
       loaded = true;
     }
@@ -311,20 +322,21 @@ export function attachSurveys(root, meeting, backend) {
     const saveGeneration = generation;
     const { client } = auth;
     const args = { p_course: backend.course_id, p_meeting: meeting.id, p_question: id };
-    const { data, error } = await call(client, 'save_answer', { ...args, p_answer: answer });
+    const send = (a) => (a === SKIP ? call(client, 'skip_question', args) : call(client, 'save_answer', { ...args, p_answer: a }));
+    const { data, error } = await send(answer);
     busy.delete(id);
     if (stop.signal.aborted) {
       // The page was left meanwhile: still send the newest answer the person asked for.
       if (pending.has(id)) {
         const next = pending.get(id);
-        flushing = flushing.then(() => call(client, 'save_answer', { ...args, p_answer: next }));
+        flushing = flushing.then(() => send(next));
       }
       return;
     }
     if (saveGeneration !== generation) return; // signed out or another person: drop it
     if (!error) {
       if (data === null) mine.delete(id);
-      else mine.set(id, { answer, updated_at: data });
+      else mine.set(id, { answer: answer === SKIP ? {} : answer, updated_at: data });
     }
     if (pending.has(id)) {
       const next = pending.get(id);
@@ -342,7 +354,10 @@ export function attachSurveys(root, meeting, backend) {
     const clearHadFocus = document.activeElement === clear;
     if (data === null) {
       fill(form, questions.get(id), undefined);
-      setStatus(form, 'Your answer was removed.');
+      setStatus(form, 'Removed.');
+    } else if (answer === SKIP) {
+      fill(form, questions.get(id), undefined);
+      setStatus(form, `Skipped on ${formatTime(data)}.`);
     } else {
       setStatus(form, `Saved on ${formatTime(data)}.`);
     }
@@ -406,6 +421,7 @@ export function attachSurveys(root, meeting, backend) {
     }
     if (auth.status !== 'member' || !loaded) return;
     if (action === 'clear') save(formFor(id), {});
+    if (action === 'skip' && !expired) save(formFor(id), SKIP);
     if (action === 'show') showOthers(id, { focus: true });
   }, { signal: stop.signal });
 

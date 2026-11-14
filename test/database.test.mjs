@@ -180,6 +180,21 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     'private.saved_by(private.revisions)': [],
     'private.survey_map(jsonb)': [],
     'private.write_part(text, text, text, jsonb, integer, text, boolean, bigint, uuid)': [],
+    // Part 4, the In-meeting tab: counts for the team, responses and "what's due" for agents.
+    'private.get_tallies(text, text)': ['authenticated'],
+    'public.get_tallies(text, text)': ['authenticated', 'service_role'],
+    'private.agent_get_responses(text)': ['anon'],
+    'private.agent_due()': ['anon'],
+    'public.agent_get_responses(text)': ['anon', 'service_role'],
+    'public.agent_due()': ['anon', 'service_role'],
+    'private.meeting_starts_at(text, text)': [],
+    'private.live_tallies(text, text)': [],
+    'private.snapshot_tallies(text, text)': [],
+    'private.current_tallies(text, text)': [],
+    'private.snapshot_on_in()': [],
+    'private.skip_question(text, text, text)': ['authenticated'],
+    'public.skip_question(text, text, text)': ['authenticated', 'service_role'],
+    'private.unskip_answer()': [],
   };
   for (const [fn, allowed] of Object.entries(expected)) {
     for (const role of ['anon', 'authenticated', 'service_role', 'supabase_auth_admin']) {
@@ -197,10 +212,10 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
   // Nothing else is reachable through the API (functions in "public").
   const fns = await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1`);
   assert.deepEqual(fns.rows.map((x) => x.proname),
-    ['add_member', 'agent_create_meeting', 'agent_get_course', 'agent_get_meeting', 'agent_put_course_notes',
-     'agent_put_section', 'agent_update_meeting', 'agent_whoami', 'create_agent_key', 'create_meeting',
-     'get_answers', 'get_course', 'get_version', 'get_versions', 'hook_before_user_created', 'is_member',
-     'keepalive', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_part', 'set_published',
+    ['add_member', 'agent_create_meeting', 'agent_due', 'agent_get_course', 'agent_get_meeting', 'agent_get_responses',
+     'agent_put_course_notes', 'agent_put_section', 'agent_update_meeting', 'agent_whoami', 'create_agent_key', 'create_meeting',
+     'get_answers', 'get_course', 'get_tallies', 'get_version', 'get_versions', 'hook_before_user_created', 'is_member',
+     'keepalive', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_part', 'set_published', 'skip_question',
      'sync_course', 'sync_meetings', 'update_course', 'update_member']);
   const tables = await db.query(`select count(*)::int as n from pg_tables where schemaname = 'public'`);
   assert.equal(tables.rows[0].n, 0, 'no tables in the API schema');

@@ -19,8 +19,13 @@ What you need first:
 
 ## 1. Update the database (once per Supabase project, per engine release)
 
-Private courses need part 3 of the database setup,
-[`20261112120000_private_content.sql`](../supabase/migrations/20261112120000_private_content.sql).
+Private courses need parts 3 and 4 of the database setup, run in this order:
+
+- part 3: [`20261112120000_private_content.sql`](../supabase/migrations/20261112120000_private_content.sql)
+- part 4 (engine v0.6.0, In-meeting tab):
+  [`20261114120000_in_meeting.sql`](../supabase/migrations/20261114120000_in_meeting.sql)
+
+For each file:
 
 1. Open https://supabase.com/dashboard and click the project (`meeting-engine`).
 2. Left sidebar: **SQL Editor** → **New query** (the **+** at the top).
@@ -121,11 +126,16 @@ imported:
 Attachments (PDFs, images, CSV files) are not imported yet; links to them are
 shown as plain text.
 
-## 8. Connect the agent (milestone 6)
+## 8. Connect the agent
 
 Create a separate key for the agent (label `OpenClaw`, **Read and write**) and
 put it straight into the agent's secret settings. The agent's interface is
 described in [agent-api.md](agent-api.md).
+
+The agent should call `agent_due` regularly (e.g. every 5 minutes) and do
+what it lists. Today that is the AI summary on the In-meeting tab, due 30
+minutes before each meeting with a time and a survey; until it's written,
+the tab shows a countdown.
 
 ## Checking that it's private
 

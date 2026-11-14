@@ -100,6 +100,7 @@ black text); navigation links and buttons are not.
   Question cards show a small "Question N" label above the headline, the
   context, and an action row: status ("✓ Answered" in green) on the left,
   "See responses" (when allowed) and "Answer" / "Edit answer" on the right.
+  A skipped question shows "Skipped" (secondary text) as its status.
   The survey itself is not on the page, so the pre-meeting reads without it.
 - **Sheets** (the survey of one question): a modal `<dialog>` (keeps focus
   inside, closes with Escape, makes the page inert). Header with the question
@@ -112,7 +113,7 @@ black text); navigation links and buttons are not.
   (iOS sheet curve `cubic-bezier(0.32, 0.72, 0, 1)`, 0.4 s); the backdrop dims
   to 38% black. No grabber, since sheets can't be dragged (yet).
 - **Buttons:** pill shaped, at least 44 px tall. Primary = filled accent (one per
-  form: "Save answer"); secondary = tinted accent ("Show other responses",
+  form: "Save answer"); secondary = tinted accent ("Skip", "Show other responses",
   "Sign in"); tertiary = plain accent text ("Remove my answer", "Sign out").
 - **Forms:** options are rows in a grouped `--surface-2` box with native radio
   buttons / checkboxes (`accent-color`), whole row clickable, checked row tinted.
@@ -123,6 +124,17 @@ black text); navigation links and buttons are not.
 - **Notices:** rounded callouts in `--fill` (information) or `--orange-tint`
   (problems), callout size text. Status messages next to buttons are short.
 - **Agenda:** a grouped list; time in secondary tabular figures on the left.
+  An item about a question has a small tinted "Q2" pill after its title that
+  scrolls to that question on the same tab (never to another tab).
+- **In-meeting tab** (works on its own, no links out): optional intro; while
+  the AI summary isn't written, a notice with a live countdown ("in 2 h 14
+  min", then "in 12:34", then "being written…"); **To decide**: one card per
+  question with a round number, the one-line `short` version as the headline,
+  "AI summary" (footnote label + callout text), "Where people disagree"
+  (orange label) for contested questions, key points in secondary text, the
+  vote bars folded under "N answers ›" once a summary exists (open before),
+  and "Full question and background ›" folded; then the agenda; the meeting
+  guide folded at the end.
 
 ## Motion
 

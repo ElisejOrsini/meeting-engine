@@ -140,8 +140,8 @@ function surveyField(question, field, disabled) {
 
 export function revealNote(meeting) {
   return meeting.reveal === 'after_answering'
-    ? 'Answering is optional. Others’ answers to a question become visible once you’ve answered it yourself.'
-    : 'Answering is optional. Others’ answers stay hidden until you click “Show other responses”.';
+    ? 'Answer or skip: others’ answers to a question become visible once you’ve done either.'
+    : 'Answer or skip. Others’ answers stay hidden until you click “Show other responses”.';
 }
 
 function questionCard(meeting, question, index) {
@@ -189,6 +189,7 @@ function surveySheet(meeting, question, index) {
           ${question.survey.map((f) => surveyField(question, f, true))}
           <div class="survey-actions" hidden>
             <button type="submit" class="button button-primary">Save answer</button>
+            <button type="button" class="button" data-action="skip">Skip</button>
             <button type="button" class="link-button" data-action="clear" hidden>Remove my answer</button>
             <span class="survey-status" role="status"></span>
           </div>
@@ -216,7 +217,76 @@ function preTab(meeting) {
       ? html`<p class="muted">Nothing to prepare for this meeting yet.</p>` : ''}`;
 }
 
-function duringTab(meeting) {
+// When the AI summary is written: 30 minutes before the meeting (by the agent).
+export const SUMMARY_LEAD_MIN = 30;
+
+/** The summary's state for a meeting at `now`: none | waiting | writing | done. */
+export function summaryState(meeting, now = Date.now()) {
+  const surveyed = meeting.questions.filter((q) => q.survey.length);
+  if (surveyed.length && surveyed.every((q) => meeting.summaries?.[q.id]?.consensus_html)) return 'done';
+  const start = Date.parse(meeting.starts_at ?? '');
+  if (!surveyed.length || Number.isNaN(start)) return 'none';
+  const end = start + (meeting.duration ?? 60) * 60_000;
+  if (now >= end) return 'none';
+  return now < start - SUMMARY_LEAD_MIN * 60_000 ? 'waiting' : 'writing';
+}
+
+/** "in 1 d 4 h", "in 3 h 12 min", "in 12:34" until `target` (ms). */
+export function countdownText(target, now = Date.now()) {
+  const s = Math.max(0, Math.floor((target - now) / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d) return `in ${d} d ${h} h`;
+  if (h) return `in ${h} h ${m} min`;
+  return `in ${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function summaryNotice(meeting, now) {
+  const state = summaryState(meeting, now);
+  if (state !== 'waiting' && state !== 'writing') return '';
+  const due = Date.parse(meeting.starts_at) - SUMMARY_LEAD_MIN * 60_000;
+  return html`
+    <p class="notice summary-countdown" data-countdown="${due}">
+      <span class="countdown-label">${state === 'waiting' ? 'AI summary of the survey answers' : 'AI summary'}</span>
+      <span class="countdown-value" data-countdown-value>${state === 'waiting' ? countdownText(due, now) : 'being written…'}</span>
+    </p>`;
+}
+
+function decideItem(meeting, question, index, state) {
+  const summary = meeting.summaries?.[question.id];
+  const short = summary?.short || question.text;
+  const hasSurvey = question.survey.length > 0;
+  return html`
+    <li class="decide-item" id="q-${question.id}" tabindex="-1">
+      <div class="decide-head">
+        <span class="decide-number" aria-hidden="true">${index + 1}</span>
+        <h3 class="decide-title"><span class="visually-hidden">Question ${index + 1}: </span>${short}</h3>
+      </div>
+      <div class="decide-body">
+        ${summary?.consensus_html ? html`
+          <div class="consensus">
+            <p class="consensus-label">AI summary</p>
+            <div class="prose">${raw(summary.consensus_html)}</div>
+          </div>` : hasSurvey && (state === 'waiting' || state === 'writing') ? html`
+          <p class="consensus-pending muted" data-countdown-for>${state === 'waiting' ? 'Summary comes 30 minutes before the meeting.' : 'Summary is being written…'}</p>` : ''}
+        ${summary?.contested && summary.disagreement_html ? html`
+          <div class="disagreement"><p class="consensus-label">Where people disagree</p><div class="prose">${raw(summary.disagreement_html)}</div></div>` : ''}
+        ${summary?.key_points?.length ? html`
+          <ul class="key-points">${summary.key_points.map((p) => html`<li>${raw(p)}</li>`)}</ul>` : ''}
+        ${hasSurvey ? html`<div class="decide-tallies" data-tallies="${question.id}" hidden></div>` : ''}
+        ${short !== question.text || question.details_html ? html`
+          <details class="decide-more">
+            <summary>Full question${question.details_html ? ' and background' : ''}</summary>
+            ${short !== question.text ? html`<p class="decide-full">${question.text}</p>` : ''}
+            ${question.details_html ? html`<div class="prose small">${raw(question.details_html)}</div>` : ''}
+          </details>` : ''}
+      </div>
+    </li>`;
+}
+
+function duringTab(meeting, now = Date.now()) {
+  const state = summaryState(meeting, now);
   let clock = meeting.time;
   const rows = meeting.agenda.map((item) => {
     let slot = '';
@@ -228,23 +298,29 @@ function duringTab(meeting) {
       clock = undefined; // can't compute later slots without minutes
     }
     const q = item.question && questionById(meeting, item.question);
+    const n = q ? meeting.questions.indexOf(q) + 1 : 0;
     return html`
       <li class="agenda-item">
         <div class="agenda-time">${slot || (item.minutes !== undefined ? `${item.minutes} min` : '')}</div>
         <div class="agenda-body">
-          <div class="agenda-title">${item.title}</div>
-          ${q ? html`<a class="agenda-question" href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">Q${meeting.questions.indexOf(q) + 1}: ${q.text}</a>` : ''}
+          <div class="agenda-title">${item.title}${q ? html` <button type="button" class="agenda-ref" data-goto="${q.id}" aria-label="Go to question ${n}">Q${n}</button>` : ''}</div>
           ${item.notes_html ? html`<div class="prose small">${raw(item.notes_html)}</div>` : ''}
         </div>
       </li>`;
   });
-  const empty = !meeting.agenda.length && !meeting.guide_html && !meeting.questions.length;
+  const empty = !meeting.agenda.length && !meeting.guide_html && !meeting.questions.length && !meeting.intro_html;
   return html`
+    ${meeting.intro_html ? html`<div class="prose lead in-intro">${raw(meeting.intro_html)}</div>` : ''}
+    ${summaryNotice(meeting, now)}
+    ${meeting.questions.length ? section('To decide', html`
+      <ol class="decide">${meeting.questions.map((q, i) => decideItem(meeting, q, i, state))}</ol>
+      ${state === 'done' && meeting.summaries_saved_at ? html`<p class="muted small summary-note">AI summary written ${new Date(meeting.summaries_saved_at).toLocaleString('en-GB', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Answers given after that aren’t in it; the vote counts are live.</p>` : ''}`) : ''}
     ${meeting.agenda.length ? section('Agenda', html`<ol class="agenda">${rows}</ol>`) : ''}
-    ${section('Meeting guide', meeting.guide_html && html`<div class="prose">${raw(meeting.guide_html)}</div>`)}
-    ${meeting.questions.length ? section('Questions to decide', html`
-      <ol class="question-list">${meeting.questions.map((q) => html`
-        <li><a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a></li>`)}</ol>`) : ''}
+    ${meeting.guide_html ? html`
+      <details class="block course-notes">
+        <summary><h2>Meeting guide</h2></summary>
+        <div class="prose">${raw(meeting.guide_html)}</div>
+      </details>` : ''}
     ${empty ? html`<p class="muted">No agenda for this meeting yet.</p>` : ''}`;
 }
 

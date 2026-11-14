@@ -1,13 +1,18 @@
 # Agent API (draft v0)
 
-**Status: version 0, partly built (milestone 5, 2026-11-12).** Part of the
+**Status: version 0, partly built (v0.6.0, 2026-11-14).** Part of the
 [architecture proposal](architecture.md). Built and tested: `agent_whoami`,
 `agent_get_course`, `agent_get_meeting`, `agent_create_meeting`,
-`agent_update_meeting`, `agent_put_section`, `agent_put_course_notes`. Still to
-come: `agent_get_responses` (milestone 6), `agent_open_scheduling`,
-`agent_get_availability` and `agent_set_time` (milestone 7). Names and shapes
-may still change until milestone 6; after that, changes get a new version
-number.
+`agent_update_meeting`, `agent_put_section`, `agent_put_course_notes`,
+`agent_get_responses` and `agent_due` (database part 4). Still to come:
+`agent_open_scheduling`, `agent_get_availability` and `agent_suggest_time`
+(scheduling, v0.8.0), then tasks and check-ins (v0.9.0). Names and shapes may
+still change until then; after that, changes get a new version number.
+
+**Rule for every new feature:** whatever a person can see or do on the site,
+an agent can too through this API (except managing the team and keys,
+publishing, picking a meeting time, and seeing who gave which answer), and
+`agent_due` lists the work that is due.
 
 This is the interface an AI agent (for example an OpenClaw agent) uses to run
 a course's meetings on a meeting-engine site: read the course and its earlier
@@ -205,28 +210,35 @@ Returns:
   people have answered, the save is refused with 400 and the count, unless
   `"force": true` is given. (Answers to removed fields are hidden; answers
   with a renamed option show "no longer an option".)
-- `in`: from milestone 6, the site stores a snapshot of the current vote
-  counts with this version; the charts use it.
+- `in`: saving it also stores a snapshot of the current vote counts. The
+  site shows live counts while the answers exist and the snapshot after they
+  are deleted (30 days after the meeting).
 - `in` and `post` items that point at a question missing from `pre` are saved,
   with a warning in `warnings`.
 
-### `agent_get_responses` (read) — milestone 6, not built yet
+### `agent_get_responses` (read)
 
 Survey results of one meeting, for writing the In-meeting part and for
 reminders. **Without names**: each person who answered gets a label
 (`P1`, `P2`, …) that is the same across all questions of this meeting, so the
-agent can see that the same person argued in two places, but not who.
+agent can see that the same person argued in two places, but not who. Only
+questions with a survey are listed; options are in survey order.
+
+```json
+{ "meeting": "late-submissions" }
+```
 
 ```json
 {
-  "as_of": "2026-11-24T10:02:00+01:00",
+  "as_of": "2026-11-24T10:02:00+01:00", "expired": false,
   "members": 11, "answered_any": 7,
   "questions": [
     { "id": "grace-period", "text": "Should we allow a grace period?", "needs_meeting": true,
-      "answered": 6,
+      "answered": 6, "skipped": 1,
       "fields": [
-        { "id": "preference", "type": "single", "label": "Which grace period?",
-          "counts": { "None": 2, "1 hour": 3, "24 hours": 1 } },
+        { "id": "preference", "type": "single", "label": "Which grace period?", "answered": 6,
+          "counts": [ { "option": "None", "count": 2 }, { "option": "1 hour", "count": 3 },
+                      { "option": "24 hours", "count": 1 } ] },
         { "id": "why", "type": "text", "label": "Why?",
           "texts": [ { "who": "P2", "text": "Most late uploads are only minutes late." } ] }
       ] }
@@ -234,10 +246,49 @@ agent can see that the same person argued in two places, but not who.
 }
 ```
 
-Answers are deleted 30 days after the meeting; after that, this returns the
-last saved counts and no texts.
+`skipped` counts people who pressed "Skip" on the question: they chose not to
+answer, so they are not votes and have no label.
 
-### `agent_open_scheduling` (write) — milestone 7, not built yet
+Answers are deleted 30 days after the meeting; after that (`"expired": true`)
+this returns the last saved counts and no texts.
+
+### `agent_due` (read)
+
+What the agent should do, soonest first. Check it on a schedule (e.g. every 5
+minutes) and act on items whose `state` is `"due"`. An item disappears once
+its work is done.
+
+```json
+{}
+```
+
+```json
+{
+  "now": "2026-11-24T15:31:00+01:00",
+  "items": [
+    { "kind": "in_summary", "meeting": "late-submissions", "title": "Late submission policy",
+      "starts_at": "2026-11-24T16:00:00+01:00", "due_at": "2026-11-24T15:30:00+01:00",
+      "state": "due", "missing": ["grace-period", "penalty"], "in_version": 1,
+      "links": { "pre": "…", "in": "…", "post": "…" } }
+  ]
+}
+```
+
+Kinds so far:
+
+- **`in_summary`**: write the AI summary on the In-meeting tab, **30 minutes
+  before the meeting** (`due_at`). Listed from 7 days before (as `"upcoming"`)
+  until the meeting ends, for published meetings with a time and a survey,
+  while a survey question has no `consensus_md` yet (`missing`). Steps:
+  `agent_get_responses` → `agent_get_meeting` (keep the existing agenda items
+  and people's edits) → `agent_put_section` `in` with `short`,
+  `consensus_md`, `key_points`, and for split questions `contested: true` +
+  `disagreement_md`, on the item of each question in `missing`. Until it's
+  written, the site shows a live countdown in its place.
+
+Later releases add kinds for scheduling and check-ins.
+
+### `agent_open_scheduling` (write) — v0.8.0, not built yet
 
 Opens the availability grid. The time zone is the course's.
 
@@ -250,7 +301,7 @@ Opens the availability grid. The time zone is the course's.
 
 Changing the grid later keeps what people filled in for slots that still exist.
 
-### `agent_get_availability` (read) — milestone 7, not built yet
+### `agent_get_availability` (read) — v0.8.0, not built yet
 
 ```json
 {
@@ -267,10 +318,11 @@ Changing the grid later keeps what people filled in for slots that still exist.
 `best` lists the start times where the most people are free for the whole
 meeting duration, best first (at most 5).
 
-### `agent_set_time` (write) — milestone 7, not built yet
+### `agent_suggest_time` (write) — v0.8.0, not built yet
 
-Sets the meeting time and closes the grid. Only when a person has chosen the
-time.
+Decided 2026-11-14: the agent only **suggests** a time; an organizer confirms
+it on the site ("Pick"), which sets the time and closes the grid. The shape
+below was the earlier `agent_set_time` draft and will change accordingly.
 
 ```json
 { "meeting": "late-submissions", "starts_at": "2026-11-24T16:00:00+01:00",
@@ -345,9 +397,14 @@ otherwise.
 }
 ```
 
-- An item either refers to a `question` from `pre` (the site adds its vote
-  charts) or is a plain agenda item with a `title`.
-- `contested: true` items are shown expanded, with `disagreement_md`.
+- `items` is the agenda, in order. An item either refers to a `question` from
+  `pre` or is a plain agenda item with a `title`. The first item of each
+  question also feeds the "To decide" list at the top of the In-meeting tab:
+  `short` as the one-line question, `consensus_md` as the AI summary,
+  `key_points` as bullets and, if `contested: true`, `disagreement_md` under
+  "Where people disagree". The site adds the vote bars itself.
+- Keep `short` to one line and `consensus_md` to two or three sentences: the
+  tab is read during the meeting.
 - Rules for the agent: paraphrase, never quote or name people; counts in the
   text must come from `agent_get_responses`.
 
@@ -397,10 +454,11 @@ preview with an in-memory database (base `http://localhost:4323/rest/v1`, no
 2. **Votes and availability:** `agent_open_scheduling`.
 3. **Invitation email:** draft it with `links.pre` and `links.schedule` from
    `agent_get_meeting`. For a reminder, `agent_get_responses` and
-   `agent_get_availability` give the counts. **Time picked:** the person picks
-   on the site or tells the agent → `agent_set_time` → draft the announcement
-   with `links.calendar`.
-4. **A few hours before:** `agent_get_responses` → `agent_put_section` `in`.
+   `agent_get_availability` give the counts. **Time:** the agent may suggest
+   one (`agent_suggest_time`); an organizer picks it on the site → draft the
+   announcement with `links.calendar`.
+4. **30 minutes before:** `agent_due` lists `in_summary` as due →
+   `agent_get_responses` → `agent_put_section` `in`.
 5. **After the meeting:** the person gives the agent the transcript →
    `agent_put_section` `post`. The transcript itself is never uploaded.
 

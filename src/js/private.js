@@ -50,21 +50,26 @@ function toMeeting(m, md) {
   }));
   const questionText = new Map(questions.map((q) => [q.id, q.text]));
 
-  // Until the In-meeting tab is redesigned, its items are shown as agenda items.
-  const agenda = (during.items ?? []).map((item) => {
-    const notes = [
-      item.consensus_md,
-      (item.key_points ?? []).length ? item.key_points.map((p) => `- ${p.replace(/\n+/g, ' ')}`).join('\n') : '',
-      item.contested && item.disagreement_md ? `**Where people disagree:** ${item.disagreement_md}` : '',
-      item.notes_md,
-    ].filter(Boolean).join('\n\n');
-    return {
-      title: item.short || item.title || questionText.get(item.question) || '',
-      minutes: Number.isInteger(item.minutes) ? item.minutes : undefined,
-      question: questionText.has(item.question) ? item.question : undefined,
-      notes_html: block(notes, INSIDE_CARD),
+  // In-meeting: the agenda (every item, in order) and, per question, the
+  // short version and the AI summary of the survey answers.
+  const items = during.items ?? [];
+  const agenda = items.map((item) => ({
+    title: item.title || item.short || questionText.get(item.question) || '',
+    minutes: Number.isInteger(item.minutes) ? item.minutes : undefined,
+    question: questionText.has(item.question) ? item.question : undefined,
+    notes_html: block(item.notes_md, INSIDE_CARD),
+  }));
+  const summaries = {};
+  for (const item of items) {
+    if (!questionText.has(item.question) || summaries[item.question]) continue;
+    summaries[item.question] = {
+      short: item.short ?? '',
+      consensus_html: block(item.consensus_md, INSIDE_CARD),
+      key_points: (item.key_points ?? []).map((p) => md.inline(p.replace(/\n+/g, ' '))),
+      contested: item.contested === true,
+      disagreement_html: block(item.disagreement_md, INSIDE_CARD),
     };
-  });
+  }
 
   const decisions = (post.decisions ?? []).map((d) => ({
     id: d.id,
@@ -86,9 +91,13 @@ function toMeeting(m, md) {
     anonymous: pre.responses?.anonymous === true,
     background_html: block(pre.background_md),
     prereading_html: block(pre.prereading_md),
-    guide_html: block([during.intro_md, during.guide_md].filter(Boolean).join('\n\n')),
+    intro_html: block(during.intro_md),
+    guide_html: block(during.guide_md),
     summary_html: block(post.summary_md),
+    starts_at: details.starts_at || undefined,
     agenda,
+    summaries,
+    summaries_saved_at: m.in?.saved_at,
     questions,
     decisions,
     next_steps: (post.next_steps ?? []).map((s) => ({

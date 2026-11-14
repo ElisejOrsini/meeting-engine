@@ -1,0 +1,335 @@
+/* Timeline mockups only (not part of the app). Loaded after src/styles.css
+   and uses its tokens, so the mockups look like the real site. */
+
+.mock-main { padding: 20px 0 64px; }
+@media (min-width: 640px) { .mock-main { padding-top: 28px; } }
+.mock-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.mock-pill {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 980px;
+  background: var(--orange-tint);
+  color: var(--orange);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.tl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tl-head h1 { margin: 0; }
+.tl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 12px 0 8px;
+  color: var(--text-2);
+  font-size: 0.8125rem;
+}
+.tl-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.tl-legend { gap: 8px 18px; }
+#timeline:focus { outline: none; }
+
+.mock-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 100;
+  max-width: min(30rem, calc(100vw - 32px));
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.mock-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
+
+/* ----- markers: shape says what it is, fill says past or upcoming ----- */
+
+.mk {
+  flex: none;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.mk-meeting.is-upcoming { background: var(--surface); box-shadow: inset 0 0 0 3px var(--accent-fill); }
+.mk-task { width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg); }
+.mk-checkin { border-radius: 50% 50% 50% 2px; }
+.mk-task.is-upcoming, .mk-checkin.is-upcoming { background: var(--surface); box-shadow: inset 0 0 0 2px var(--accent-fill); }
+.mk-window { width: 20px; height: 10px; border-radius: 5px; background: var(--accent-tint); box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* ----- sheet content ----- */
+
+.sheet-text { margin: 12px 0 0; }
+.sheet-prompt { margin: 0 0 4px; font-size: 1.0625rem; font-weight: 600; }
+.sheet-h { margin: 24px 0 10px; font-size: 1rem; font-weight: 600; }
+.sheet-actions { margin: 24px 0 0; }
+.mk-decisions { list-style: none; margin: 0; padding: 0; }
+.mk-decisions li { position: relative; padding: 4px 0 4px 26px; }
+.mk-decisions li::before { content: "\2713"; position: absolute; left: 2px; color: var(--green); font-weight: 700; }
+.ci-form { margin-top: 20px; }
+.text-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+}
+.text-input:focus-visible { outline: 2px solid transparent; border-color: var(--accent-fill); box-shadow: 0 0 0 3px rgb(0 113 227 / 0.35); }
+.add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.add-row .field { margin-bottom: 20px; }
+[hidden] { display: none !important; }
+
+/* Wide sheet for the availability grids */
+.sheet.sheet-wide { width: min(58rem, calc(100vw - 32px)); }
+@media (max-width: 640px) { .sheet.sheet-wide { width: 100%; } }
+
+/* ----- availability ("when to meet") ----- */
+
+.av { --cell: color-mix(in srgb, var(--text) 9%, var(--surface)); }
+.av-switch { margin: 16px 0 4px; }
+@media (max-width: 859px) { .av-pane > .sheet-h { display: none; } .av-hint, .av-count { margin-top: 14px; } }
+.av-panes { display: grid; gap: 28px; }
+.av-panes[data-show="mine"] .av-pane-all, .av-panes[data-show="all"] .av-pane-mine { display: none; }
+@media (min-width: 860px) {
+  .av-switch { display: none; }
+  .av-panes { grid-template-columns: 1fr 1fr; }
+  .av-panes .av-pane { display: block !important; }
+}
+.av-pane .sheet-h { margin-top: 16px; margin-bottom: 2px; }
+.av-hint, .av-count { margin: 0 0 10px; }
+.av-grid {
+  display: grid;
+  grid-template-rows: 2.4rem;
+  grid-auto-rows: 15px;
+  column-gap: 3px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.av-grid-mine { touch-action: none; cursor: crosshair; }
+.av-day {
+  align-self: end;
+  padding-bottom: 6px;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--text-2);
+}
+.av-day b { display: block; color: var(--text); font-weight: 600; }
+.av-time {
+  margin-top: -0.45em;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 0.6875rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.av-cell {
+  background: var(--cell);
+  border-top: 1px solid var(--separator);
+  transition: background-color 0.1s;
+}
+.av-cell.is-half { border-top-style: dotted; }
+.av-grid-mine .av-cell:hover { background: color-mix(in srgb, var(--cell), var(--accent-fill) 20%); }
+.av-grid-mine .av-cell.is-on { background: var(--accent-fill); border-top-color: rgb(255 255 255 / 0.25); }
+.av-grid-all .av-cell { --p: 0%; background: color-mix(in srgb, var(--accent-fill) var(--p), var(--cell)); cursor: pointer; }
+.av-grid-all .av-cell.is-selected, .av-grid-all .av-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; position: relative; z-index: 1; }
+.av-legend { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 0.75rem; color: var(--text-2); }
+.av-legend-bar { flex: 0 1 8rem; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--cell), var(--accent-fill)); }
+.av-info { margin: 10px 0 0; min-height: 4.5em; font-size: 0.875rem; line-height: 1.45; }
+.av-status { display: block; min-height: 1.5em; margin-top: 8px; }
+.av-best { margin-top: 8px; }
+.av-best .list { background: var(--surface-2); }
+.av-best-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.av-best-row .row-subtitle { font-size: 0.8125rem; }
+
+/* =====================================================================
+   The timeline: one vertical line (top = September, bottom = December)
+   ===================================================================== */
+
+/* One colour per kind of item, used only for its icon and its small label.
+   Past items turn grey. (Apple system colours, darkened for AA contrast.) */
+:root {
+  --c-meeting: var(--accent);
+  --c-meeting-tint: var(--accent-tint);
+  --c-checkin: #8a3fb3;
+  --c-checkin-tint: rgb(138 63 179 / 0.12);
+  --c-task: #00757a;
+  --c-task-tint: rgb(0 117 122 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-checkin: #d08bf5;
+    --c-checkin-tint: rgb(191 90 242 / 0.2);
+    --c-task: #5fd9d2;
+    --c-task-tint: rgb(95 217 210 / 0.16);
+  }
+}
+
+.chip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--chip);
+  background: var(--chip-tint);
+  --chip: var(--c-meeting);
+  --chip-tint: var(--c-meeting-tint);
+}
+.chip-checkin { --chip: var(--c-checkin); --chip-tint: var(--c-checkin-tint); }
+.chip-task { --chip: var(--c-task); --chip-tint: var(--c-task-tint); border-radius: 8px; }
+.chip-window { background: var(--surface); outline: 1.5px dashed var(--c-meeting); outline-offset: -1.5px; }
+.chip.is-past { --chip: var(--text-2); --chip-tint: var(--fill); }
+.tl-legend .chip { width: 22px; height: 22px; }
+.tl-legend .chip svg { width: 12px; height: 12px; }
+
+.vt {
+  --date-col: 5.75rem;
+  --rail: 28px;
+  --line-x: calc(var(--date-col) + var(--rail) / 2 - 1px);
+  position: relative;
+  padding: 8px 0 40px;
+}
+@media (max-width: 520px) { .vt { --date-col: 4.5rem; } }
+
+/* The line: every row draws its own piece, solid before today, dashed after. */
+.vt-row { position: relative; }
+.vt-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--line-x);
+  width: 2px;
+  background: var(--text-3);
+  opacity: 0.5;
+}
+.vt-row.is-future::before { background: repeating-linear-gradient(to bottom, var(--text-3) 0 5px, transparent 5px 10px); }
+.vt-row.is-today::before { background: linear-gradient(to bottom, var(--text-3) 50%, transparent 50%); }
+
+.vt-row { display: grid; grid-template-columns: var(--date-col) var(--rail) minmax(0, 1fr); align-items: center; }
+.vt-date {
+  padding-right: 12px;
+  text-align: right;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.vt-rail { position: relative; z-index: 1; display: flex; justify-content: center; }
+.vt-rail .chip { box-shadow: 0 0 0 4px var(--bg); }
+.vt-rail .chip-window { box-shadow: 0 0 0 4px var(--bg); }
+
+/* Months */
+.vt-month.vt-row { display: block; margin: 0; padding: 28px 0 6px calc(var(--date-col) + var(--rail) + 12px); font-size: 1.3125rem; font-weight: 700; letter-spacing: -0.014em; }
+
+/* Week headers: a short tick across the line, the teaching week and the dates */
+.vt-weekhead { min-height: 34px; margin-top: 6px; }
+.vt-weekhead .vt-date { font-size: 0.75rem; font-weight: 600; color: var(--text-2); }
+.vt-wtick { width: 14px; height: 2px; border-radius: 1px; background: var(--text-3); }
+.vt-weektext { padding-left: 12px; font-size: 0.8125rem; font-weight: 600; color: var(--text-2); }
+.vt-relweek { font-weight: 400; }
+.vt-weekhead.is-current .vt-weektext, .vt-weekhead.is-current .vt-date { color: var(--accent); }
+.vt-weekhead.is-current .vt-wtick { background: var(--accent-fill); }
+.vt-weekhead.is-quiet { min-height: 28px; margin-top: 2px; }
+.vt-weekhead.is-quiet .vt-weektext, .vt-weekhead.is-quiet .vt-date { font-weight: 400; color: var(--text-3); }
+
+/* Empty days near today: just the weekday and a small tick */
+.vt-dayrow { min-height: 26px; }
+.vt-dayrow .vt-date { font-size: 0.75rem; color: var(--text-3); }
+.vt-dayrow.is-weekend .vt-date { opacity: 0.7; }
+.vt-daytick { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); opacity: 0.6; box-shadow: 0 0 0 3px var(--bg); }
+
+/* Items */
+.vt-item {
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vt-item:focus-visible { outline: none; }
+.vt-item:focus-visible .vt-card { outline: 3px solid var(--focus); outline-offset: 1px; }
+.vt-wd { display: block; color: var(--text); font-weight: 600; font-size: 0.875rem; }
+.vt-rel { display: block; font-size: 0.75rem; color: var(--text-2); }
+.vt-item.is-done .vt-wd { color: var(--text-2); font-weight: 500; }
+.vt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin-left: 10px;
+  padding: 9px 14px;
+  border-radius: 14px;
+  transition: background-color 0.15s, transform 0.1s ease-out;
+}
+.vt-item:hover .vt-card { background: var(--hover); }
+.vt-item.is-upcoming .vt-card { background: var(--surface); }
+.vt-item.is-upcoming:hover .vt-card { background: color-mix(in srgb, var(--surface), var(--text) 3%); }
+.vt-item:active .vt-card { transform: scale(0.98); }
+.vt-kind { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em; color: var(--c-meeting); }
+.kind-checkin .vt-kind { color: var(--c-checkin); }
+.kind-task .vt-kind { color: var(--c-task); }
+.vt-item.is-done .vt-kind { color: var(--text-2); }
+.vt-title { font-weight: 600; line-height: 1.3; }
+.vt-sub { font-size: 0.875rem; color: var(--text-2); }
+.vt-item.is-done .vt-title { font-weight: 500; }
+
+/* The shaded span of a planned meeting: its days sit inside it */
+.vt-span { position: relative; margin: 6px 0; }
+.vt-span::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0 -2px calc(var(--date-col) + 1px);
+  border-radius: 16px;
+  background: var(--accent-tint);
+  pointer-events: none;
+}
+.vt-span > .vt-row { z-index: 1; }
+.vt-span .vt-row::before { left: calc(var(--line-x) - 2px); width: 6px; background: var(--accent-fill); opacity: 0.4; }
+.vt-span .vt-dayrow .vt-date { color: var(--accent); }
+.vt-span .vt-daytick { background: var(--accent-fill); box-shadow: none; }
+.vt-span-end {
+  position: absolute;
+  z-index: 1;
+  bottom: 8px;
+  left: 0;
+  width: var(--date-col);
+  padding-right: 12px;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+.vt-item.kind-window .vt-card, .vt-item.kind-window:hover .vt-card { background: transparent; }
+.fake-button {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 980px;
+  background: var(--accent-fill);
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* Today */
+.vt-today { min-height: 34px; margin: 2px 0; }
+.vt-today .vt-wd { color: var(--accent); }
+.vt-today-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--accent-tint); }
+.vt-today-line { display: flex; align-items: center; gap: 10px; margin-left: 12px; color: var(--accent); font-size: 0.875rem; font-weight: 600; }
+.vt-today-line::after { content: ""; flex: 1; height: 2px; border-radius: 1px; background: var(--accent-fill); opacity: 0.35; }

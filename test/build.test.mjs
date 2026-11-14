@@ -283,3 +283,38 @@ test('content: reveal mode defaults to anytime', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('views: the In-meeting tab works on its own (no links to Pre-meeting) and counts down to the AI summary', async () => {
+  const { meetingView, summaryState, countdownText } = await import('../src/js/views.js');
+  const start = Date.parse('2026-11-17T13:00:00Z');
+  const meeting = {
+    id: 'm', title: 'M', date: '2026-11-17', time: '14:00', duration: 60, starts_at: '2026-11-17T13:00:00Z',
+    questions: [
+      { id: 'a', text: 'Should we allow a grace period?', details_html: '<p>Context</p>', survey: [{ id: 'p', type: 'single', label: 'Which?', options: ['x', 'y'] }] },
+      { id: 'b', text: 'Rooms?', details_html: '', survey: [] },
+    ],
+    agenda: [{ title: 'Grace', minutes: 20, question: 'a', notes_html: '' }, { title: 'Wrap-up', minutes: 5 }],
+    decisions: [], summaries: {}, guide_html: '', intro_html: '',
+  };
+  assert.equal(summaryState(meeting, start - 3 * 3600_000), 'waiting');
+  assert.equal(summaryState(meeting, start - 10 * 60_000), 'writing');
+  assert.equal(summaryState(meeting, start + 2 * 3600_000), 'none', 'nothing to wait for after the meeting');
+  assert.equal(summaryState({ ...meeting, starts_at: undefined }, start), 'none', 'no countdown without a time');
+  assert.equal(countdownText(start, start - (26 * 3600 + 60) * 1000), 'in 1 d 2 h');
+  assert.equal(countdownText(start, start - 754_000), 'in 12:34');
+
+  const waiting = String(meetingView(meeting, 'during').body);
+  assert.doesNotMatch(waiting.split('tab-panel')[1], /\/pre|href=/, 'no links out of the tab (back to Pre-meeting)');
+  assert.match(waiting, /data-countdown="\d+"/);
+  assert.match(waiting, /data-goto="a"[^>]*>Q1</);
+  assert.match(waiting, /14:00–14:20/);
+
+  const done = { ...meeting, summaries: { a: { short: 'Grace period?', consensus_html: '<p>Most want 1 hour.</p>', key_points: [], contested: true, disagreement_html: '<p>15 min vs 1 h</p>' } } };
+  assert.equal(summaryState(done, start - 10 * 60_000), 'done');
+  const shown = String(meetingView(done, 'during').body);
+  assert.doesNotMatch(shown, /data-countdown=/);
+  assert.match(shown, /Grace period\?<\/h3>/);
+  assert.match(shown, /Most want 1 hour/);
+  assert.match(shown, /Where people disagree/);
+  assert.match(shown, /Should we allow a grace period\?/, 'the full question is still there, folded');
+});

@@ -15,6 +15,7 @@
 import { html } from './dom.js';
 import { onAuth, startAuth, takeAuthRedirect } from './auth.js';
 import { attachSurveys, detachSurveys } from './surveys.js';
+import { attachInMeeting, detachInMeeting } from './inmeeting.js';
 import {
   TABS, defaultTab, meetingsView, meetingView, decisionsView, decisionCount, decisionList,
   allDecisions, filterDecisions, notFoundView, errorView, signInView, teamView,
@@ -57,6 +58,7 @@ function show(view, nav) {
 
 function showSignIn() {
   detachSurveys();
+  detachInMeeting();
   show(loadError ? errorView(loadError) : signInView(auth.status), null);
   main.querySelector('[data-action="sign-in"]')?.addEventListener('click', () => {
     document.querySelector('[data-auth="sign-in"]')?.click();
@@ -86,6 +88,7 @@ function route() {
     else {
       show(meetingView(meeting, tab, undefined, { organizer: site.me?.organizer === true }), 'meetings');
       if (tab === 'pre') attachSurveys(main, meeting, site.backend);
+      if (tab === 'during') attachInMeeting(main, meeting, site.backend);
       if (site.private) attachPublish(main, context);
     }
   } else if (parts[0] === 'decisions' && parts.length === 1) {

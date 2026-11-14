@@ -87,8 +87,9 @@ responses:
   # Answering is always optional. Others' answers start hidden in both modes.
   # anytime: anyone on the team can click "Show other responses", answered or not
   # after_answering: for each question, the button only works once you've
-  #   answered it yourself (avoids anchoring; people who don't answer never
-  #   see the others)
+  #   answered or skipped it yourself (avoids anchoring); the In-meeting
+  #   vote counts follow the same rule and open for everyone 30 minutes
+  #   before the meeting
   anonymous: false                # optional, default false; true: teammates see
                                   # the answers but not who gave them
 
@@ -120,8 +121,10 @@ With sign-in set up (`backend:` in `course.yml`, see
 [backend-setup.md](backend-setup.md)), team members can answer the survey
 fields on the Pre-meeting tab:
 
-- Answering is optional, and everyone can change or remove their answer at any
-  time.
+- Answering is optional: next to "Save answer" there is a **Skip** button.
+  A skip counts like an answer for seeing the others' answers and the vote
+  counts (with `after_answering`), but it isn't a vote and teammates don't see
+  who skipped. Everyone can change or remove their answer or skip at any time.
 - Others' answers are shown on request, following `responses.reveal`. Names are
   shown next to answers, unless the meeting has `responses.anonymous: true`.
 - Answers are deleted automatically **30 days after the meeting**. Anything
