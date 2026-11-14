@@ -136,6 +136,21 @@ black text); navigation links and buttons are not.
   and "Full question and background ›" folded; then the agenda; the meeting
   guide folded at the end.
 
+- **Timeline** (`#/timeline`, design and reasons in
+  [timeline-design/DECISION.md](timeline-design/DECISION.md)): one vertical
+  line, oldest at the top, opening with today in the middle. Three columns per
+  row: date (right-aligned, secondary), rail with the line, content. The line
+  is solid up to today and dashed after. Months are large headings; every week
+  has a small header ("Week 10 · 16–22 Nov · Next week", the current week in
+  accent). This week and the next two show every day as a slim row; further
+  away only days with something on, and runs of empty weeks merge into one
+  quiet line ("Weeks 2–8 · … · nothing on"). Today: an accent dot with a soft
+  ring and a thin accent line. Each item has a round icon chip on the line;
+  upcoming items sit on `--surface` cards, past items are plain text with a
+  grey chip and label. A click opens a sheet (same component as the survey
+  sheets) with the facts, the summary, the decisions (green ✓) and "Open
+  meeting".
+
 ## Motion
 
 - Buttons, segments and list rows react on press: `transform: scale(0.97)`
@@ -154,7 +169,7 @@ black text); navigation links and buttons are not.
 
 1. `npm run dev` (port 4321) and `npm run dev:mock` (port 4322, signed in with
    survey states).
-2. Look at the start page, a meeting's three tabs, the Decisions page, and the
+2. Look at the start page, a meeting's three tabs, the Timeline, and the
    survey sheet in each state (signed out, answering, responses shown), in
    light and dark, at 320 px and desktop width.
 3. Tab through the page: every control shows a focus ring and nothing is hidden

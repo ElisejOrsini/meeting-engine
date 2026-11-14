@@ -252,7 +252,7 @@ function checker(problems, file, where) {
   };
 }
 
-const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [], home: null };
+const DEFAULT_COURSE = { name: 'Meetings', description_html: '', links: [], home: null, semester: null };
 // home.url: a full https:// address, or a path on the same website ("../", "/AIP-PAGE/").
 const HOME_URL_PATTERN = /^(https:\/\/[^\s"'<>\\]+|(\.\.\/|\.\/|\/)[^\s"'<>\\]*|\.\.)$/;
 const NO_COURSE = { course: DEFAULT_COURSE, backend: null, members: [], isPrivate: false };
@@ -310,6 +310,35 @@ function loadMembers(list, file, problems) {
   }).filter(Boolean);
 }
 
+/**
+ * The optional `semester:` section: when teaching week 1 starts, so the
+ * timeline can say "Week 10". start is a date (the Monday of week 1),
+ * weeks the number of teaching weeks (default 14).
+ */
+function loadSemester(raw, file, problems) {
+  if (raw === undefined || raw === null) return null;
+  if (!isObject(raw)) {
+    problems.error(file, '"semester" must have "start" (and optionally "weeks")');
+    return null;
+  }
+  const c = checker(problems, file, 'semester');
+  c.keys(raw, ['start', 'weeks']);
+  let start = c.string(raw, 'start', { required: true, pattern: DATE_PATTERN, patternHint: 'must look like 2026-09-14' });
+  if (start && !isRealDate(start)) {
+    problems.error(file, `"semester.start" is not a real calendar date (got "${start}")`);
+    start = undefined;
+  }
+  if (start && new Date(`${start}T00:00:00Z`).getUTCDay() !== 1) {
+    problems.warn(file, `"semester.start" (${start}) is not a Monday; week 1 is counted from the Monday before it`);
+  }
+  let weeks = raw.weeks ?? 14;
+  if (!Number.isInteger(weeks) || weeks < 1 || weeks > 52) {
+    problems.error(file, `"semester.weeks" must be a whole number from 1 to 52 (got ${JSON.stringify(raw.weeks)})`);
+    weeks = undefined;
+  }
+  return start && weeks ? { start, weeks } : null;
+}
+
 function loadCourse(raw, file, problems) {
   if (raw === undefined) {
     problems.error(file, 'missing course.yml');
@@ -321,7 +350,7 @@ function loadCourse(raw, file, problems) {
     return NO_COURSE;
   }
   const c = checker(problems, file, '');
-  c.keys(raw, ['name', 'description', 'links', 'home', 'backend', 'members', 'private']);
+  c.keys(raw, ['name', 'description', 'links', 'home', 'semester', 'backend', 'members', 'private']);
   const backend = loadBackend(raw.backend, file, problems);
   const isPrivate = raw.private === true;
   if (raw.private !== undefined && typeof raw.private !== 'boolean') {
@@ -382,6 +411,7 @@ function loadCourse(raw, file, problems) {
       description_html: descriptionHtml,
       links,
       home,
+      semester: loadSemester(raw.semester, file, problems),
     },
     backend,
     members,
@@ -500,8 +530,6 @@ function loadDecisions(raw, file, problems, md, questionIds) {
       question: question && questionIds.has(question) ? question : undefined,
       decision_html: md.block(decision, opts),
       rationale_html: md.block(rationale, opts),
-      // Plain text for client-side search.
-      search_text: `${decision}\n${rationale}`,
     };
   }).filter(Boolean);
 }

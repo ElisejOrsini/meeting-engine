@@ -76,7 +76,6 @@ function toMeeting(m, md) {
     question: questionText.has(d.question) ? d.question : undefined,
     decision_html: block(d.decision_md, INSIDE_CARD),
     rationale_html: block(d.rationale_md, INSIDE_CARD),
-    search_text: `${d.decision_md ?? ''}\n${d.rationale_md ?? ''}`,
   }));
 
   return {
@@ -111,7 +110,7 @@ function toMeeting(m, md) {
 }
 
 /** The site object for the views, from get_course's answer. */
-export function toSite(data, { createMarkdown, engine, backend }) {
+export function toSite(data, { createMarkdown, engine, backend, semester = null }) {
   const md = createMarkdown({ files: false }); // no attachments in private courses (yet)
   const meetings = (data.meetings ?? []).map((m) => toMeeting(m, md));
   // Newest first, like the build; meetings without a time count as upcoming.
@@ -125,6 +124,7 @@ export function toSite(data, { createMarkdown, engine, backend }) {
       name: data.course?.name ?? 'Meetings',
       description_html: md.block(data.course?.description_md ?? '', { headingOffset: UNDER_SECTION }),
       links: [],
+      semester, // from course.yml (public): when teaching week 1 starts
       notes_html: md.block(data.notes?.content?.notes_md ?? '', { headingOffset: UNDER_SECTION }),
       notes_saved: savedInfo(data.notes),
     },

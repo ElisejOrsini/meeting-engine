@@ -4,7 +4,7 @@
 //   #/                         all meetings
 //   #/m/<meeting-id>           a meeting (picks a sensible tab)
 //   #/m/<meeting-id>/<tab>     tab = pre | during | post   (?focus=<question-id>)
-//   #/decisions?q=<search>     all decisions, searchable
+//   #/timeline                 every meeting on one line (#/decisions still leads here)
 //   #/team                     the team list and agent keys (private courses)
 //
 // Sign-in (only with a backend in course.yml) lives in auth.js. Private
@@ -16,9 +16,9 @@ import { html } from './dom.js';
 import { onAuth, startAuth, takeAuthRedirect } from './auth.js';
 import { attachSurveys, detachSurveys } from './surveys.js';
 import { attachInMeeting, detachInMeeting } from './inmeeting.js';
+import { timelineView, attachTimeline, detachTimeline, centerToday } from './timeline.js';
 import {
-  TABS, defaultTab, meetingsView, meetingView, decisionsView, decisionCount, decisionList,
-  allDecisions, filterDecisions, notFoundView, errorView, signInView, teamView,
+  TABS, defaultTab, meetingsView, meetingView, notFoundView, errorView, signInView, teamView,
 } from './views.js';
 import { toSite } from './private.js';
 import { attachTeam, attachPublish } from './team.js';
@@ -59,6 +59,7 @@ function show(view, nav) {
 function showSignIn() {
   detachSurveys();
   detachInMeeting();
+  detachTimeline();
   show(loadError ? errorView(loadError) : signInView(auth.status), null);
   main.querySelector('[data-action="sign-in"]')?.addEventListener('click', () => {
     document.querySelector('[data-auth="sign-in"]')?.click();
@@ -76,6 +77,8 @@ function route() {
   const pathChanged = path !== lastPath;
   lastPath = path;
   detachSurveys();
+  detachInMeeting();
+  detachTimeline();
   const context = { site, client: auth.client, reload: loadPrivate };
 
   if (parts.length === 0) {
@@ -91,9 +94,14 @@ function route() {
       if (tab === 'during') attachInMeeting(main, meeting, site.backend);
       if (site.private) attachPublish(main, context);
     }
-  } else if (parts[0] === 'decisions' && parts.length === 1) {
-    show(decisionsView(site, params.get('q') ?? ''), 'decisions');
-    wireDecisionSearch();
+  } else if ((parts[0] === 'timeline' || parts[0] === 'decisions') && parts.length === 1) {
+    // The Decisions page became the timeline (v0.7.0); old links still work.
+    if (parts[0] === 'decisions') {
+      history.replaceState(null, '', '#/timeline');
+      lastPath = 'timeline';
+    }
+    show(timelineView(site), 'timeline');
+    attachTimeline(main);
   } else if (parts[0] === 'team' && parts.length === 1 && site.private) {
     show(teamView(site), 'team');
     attachTeam(main, context);
@@ -110,26 +118,11 @@ function route() {
     target.scrollIntoView({ block: 'start' });
   } else if (pathChanged) {
     window.scrollTo(0, 0);
+    if (main.querySelector('#tl-today')) centerToday(main);
     // After in-app navigation, move focus to the new page's heading so screen
     // readers announce it (on first load the browser handles this).
     if (!firstRender) main.querySelector('h1')?.focus({ preventScroll: true });
   }
-}
-
-function wireDecisionSearch() {
-  const input = document.getElementById('decision-search');
-  const results = document.getElementById('decision-results');
-  const count = document.getElementById('decision-count');
-  const entries = allDecisions(site);
-  input.addEventListener('input', () => {
-    const q = input.value.trim();
-    const shown = filterDecisions(entries, q);
-    results.innerHTML = String(decisionList(shown));
-    // Update the text of the existing status element so screen readers announce it.
-    count.textContent = decisionCount(shown.length, entries.length, q);
-    // Keep the search in the address bar (shareable) without re-rendering.
-    history.replaceState(null, '', q ? `#/decisions?q=${encodeURIComponent(q)}` : '#/decisions');
-  });
 }
 
 /** Private courses: (re)load the content from the database and redraw. */
@@ -143,7 +136,9 @@ async function loadPrivate() {
     answer = await client.rpc('get_course', { p_course: config.backend.course_id });
     if (answer.error) throw new Error(answer.error.message);
     if (mine !== loadGeneration) return; // signed out (or reloaded) meanwhile
-    site = toSite(answer.data, { createMarkdown, engine: config.engine, backend: config.backend });
+    site = toSite(answer.data, {
+      createMarkdown, engine: config.engine, backend: config.backend, semester: config.course?.semester ?? null,
+    });
     loadError = null;
   } catch (err) {
     if (mine !== loadGeneration) return;

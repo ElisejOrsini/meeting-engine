@@ -144,13 +144,14 @@ the answers are deleted (30 days after the meeting).
 
 1. **Design session** finishes the timeline look and features. *(done, see
    [timeline-design/DECISION.md](timeline-design/DECISION.md))*
-2. **v0.6.0 In-meeting tab** (part C). *(built 14 Nov, not released yet;
-   database part 4 = `supabase/migrations/20261114120000_in_meeting.sql`,
-   also adds `agent_get_responses` and `agent_due`)* Doesn't depend on the design, so it can
-   be built now. Needs the `tallies` snapshot (small SQL change).
+2. **v0.6.0 In-meeting tab** (part C). *(released 14 Nov; database part 4 =
+   `supabase/migrations/20261114120000_in_meeting.sql`, also adds
+   `agent_get_responses` and `agent_due`)*
 3. **v0.7.0 Timeline with meetings only** (part A, no new data): replaces the
-   Decisions tab.
-4. **v0.8.0 Scheduling** (availability windows and grid, DB part 4).
+   Decisions tab. *(built 14 Nov, not released yet: `src/js/timeline.js`,
+   `#/timeline`, old `#/decisions` links lead there; new optional
+   `semester: { start, weeks }` in course.yml for the "Week 10" labels)*
+4. **v0.8.0 Scheduling** (availability windows and grid, DB part 5).
 5. **v0.9.0 Tasks and check-ins.**
 
 Each release: tests, preview on `private-local`, your OK, then tag and push.

@@ -1,6 +1,6 @@
 # Settings of this team's private meeting site. Every option is explained in
 # the engine's docs:
-# https://github.com/ElisejOrsini/meeting-engine/blob/v0.6.0/docs/private-course.md
+# https://github.com/ElisejOrsini/meeting-engine/blob/v0.7.0/docs/private-course.md
 #
 # This repository only configures the website: the meetings, the team list
 # and everything else the team writes live in the database, and only signed-in
@@ -8,6 +8,11 @@
 
 name: "REPLACE_WITH_COURSE_NAME"   # shown in the header, also before sign-in
 private: true                      # content lives in the database, not here
+
+# When teaching week 1 starts (optional; the timeline then says "Week 10"):
+# semester:
+#   start: 2026-09-14   # the Monday of week 1
+#   weeks: 14
 
 # The shared Supabase project. The URL and the publishable key are public by
 # design. Never put the secret key (sb_secret_...) here or anywhere in this

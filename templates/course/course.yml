@@ -1,5 +1,5 @@
 # Course settings. Every option is explained in the engine's docs:
-# https://github.com/ElisejOrsini/meeting-engine/blob/v0.6.0/docs/content-format.md
+# https://github.com/ElisejOrsini/meeting-engine/blob/v0.7.0/docs/content-format.md
 #
 # This file, like everything in this repository, is public.
 
@@ -11,6 +11,11 @@ description: |
 # links:
 #   - title: Course website
 #     url: https://example.org
+
+# When teaching week 1 starts (optional; the timeline then says "Week 10"):
+# semester:
+#   start: 2026-09-14   # the Monday of week 1
+#   weeks: 14
 
 # Sign-in with GitHub and survey answers (optional). Set this up with
 # docs/new-course.md (step 5) in the engine. To switch it on, remove the "# "

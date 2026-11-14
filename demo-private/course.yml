@@ -3,6 +3,8 @@
 # database when the preview starts; nothing here talks to a real backend.
 name: "Applied Widgetry (private preview)"
 private: true
+semester:                          # teaching week 1 starts on this Monday
+  start: 2026-09-14
 backend:
   url: https://aaaaaaaaaaaaaaaaaaaa.supabase.co   # replaced by the local backend
   publishable_key: sb_publishable_local_preview_only

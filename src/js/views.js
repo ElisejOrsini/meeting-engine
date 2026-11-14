@@ -34,12 +34,12 @@ function addMinutes(time, minutes) {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
-function timeRange(meeting) {
+export function timeRange(meeting) {
   if (!meeting.time) return '';
   return meeting.duration ? `${meeting.time}–${addMinutes(meeting.time, meeting.duration)}` : meeting.time;
 }
 
-function plural(n, word) {
+export function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
@@ -56,7 +56,7 @@ function questionById(meeting, id) {
   return meeting.questions.find((q) => q.id === id);
 }
 
-function meetingFacts(meeting) {
+export function meetingFacts(meeting) {
   const facts = [meeting.date ? formatDate(meeting.date) : 'Time not set yet', timeRange(meeting),
     meeting.location_html ? raw(meeting.location_html) : meeting.location].filter(Boolean);
   return html`<p class="facts">${facts.map((f, i) => html`${i ? html`<span aria-hidden="true"> · </span>` : ''}<span>${f}</span>`)}</p>`;
@@ -324,12 +324,10 @@ function duringTab(meeting, now = Date.now()) {
     ${empty ? html`<p class="muted">No agenda for this meeting yet.</p>` : ''}`;
 }
 
-function decisionCard(decision, { meeting, showMeeting = false }) {
+function decisionCard(decision, { meeting }) {
   const question = decision.question && questionById(meeting, decision.question);
   return html`
     <article class="card decision">
-      ${showMeeting ? html`
-        <p class="decision-meta"><span>${formatDate(meeting.date, { weekday: false })}</span> · <a href="${link('m', meeting.id, 'post')}">${meeting.title}</a></p>` : ''}
       ${question ? html`<p class="decision-question"><a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(question.id)}">${question.text}</a></p>` : ''}
       <div class="prose decision-text">${raw(decision.decision_html)}</div>
       ${decision.rationale_html ? html`<div class="prose rationale"><span class="rationale-label">Why:</span> ${raw(decision.rationale_html)}</div>` : ''}
@@ -407,52 +405,6 @@ export function meetingView(meeting, tab, today = localToday(), { organizer = fa
       </nav>
       ${draftBanner(meeting, organizer)}
       <div class="tab-panel">${content}${savedLine(saved)}</div>`,
-  };
-}
-
-// ---------- decisions page ----------
-
-/** Every decision across all meetings, newest meeting first. */
-export function allDecisions(site) {
-  return site.meetings.flatMap((meeting) => meeting.decisions.map((decision) => {
-    const question = decision.question && questionById(meeting, decision.question);
-    const haystack = [decision.search_text, question?.text, meeting.title, meeting.date, formatDate(meeting.date)]
-      .filter(Boolean).join('\n').toLowerCase();
-    return { meeting, decision, haystack };
-  }));
-}
-
-export function filterDecisions(entries, query) {
-  const terms = String(query ?? '').toLowerCase().split(/\s+/).filter(Boolean);
-  return terms.length ? entries.filter((e) => terms.every((t) => e.haystack.includes(t))) : entries;
-}
-
-/** Text for the result count, e.g. "2 decisions match “grace” (of 9)." */
-export function decisionCount(shown, total, query) {
-  if (!total) return 'No decisions have been recorded yet.';
-  return query
-    ? `${plural(shown, 'decision')} ${shown === 1 ? 'matches' : 'match'} “${query}” (of ${total}).`
-    : `${plural(total, 'decision')} from all meetings.`;
-}
-
-export function decisionList(entries) {
-  return html`${entries.map((e) => decisionCard(e.decision, { meeting: e.meeting, showMeeting: true }))}`;
-}
-
-export function decisionsView(site, query) {
-  const entries = allDecisions(site);
-  const shown = filterDecisions(entries, query);
-  return {
-    title: 'Decisions',
-    body: html`
-      <h1 tabindex="-1">Decisions</h1>
-      <p class="lead">Everything decided in past meetings, newest first.</p>
-      <div class="search">
-        <label for="decision-search">Search decisions</label>
-        <input id="decision-search" type="search" placeholder="e.g. attendance, grace period" value="${query ?? ''}" autocomplete="off">
-      </div>
-      <p id="decision-count" class="muted" role="status">${decisionCount(shown.length, entries.length, query)}</p>
-      <div id="decision-results">${decisionList(shown)}</div>`,
   };
 }
 

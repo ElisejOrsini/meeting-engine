@@ -318,3 +318,69 @@ test('views: the In-meeting tab works on its own (no links to Pre-meeting) and c
   assert.match(shown, /Where people disagree/);
   assert.match(shown, /Should we allow a grace period\?/, 'the full question is still there, folded');
 });
+
+test('content: course.yml "semester" sets teaching week 1', async () => {
+  const dir = await fixture({
+    'course.yml': 'name: T\nsemester:\n  start: 2026-09-14\n',
+  });
+  const bad = await fixture({
+    'course.yml': 'name: T\nsemester:\n  start: 2026-09-31\n  weeks: 0\n',
+  });
+  try {
+    const ok = await loadContent(dir);
+    assert.deepEqual(ok.site.course.semester, { start: '2026-09-14', weeks: 14 });
+    const wrong = await loadContent(bad);
+    const all = wrong.errors.map((e) => e.message ?? String(e)).join('\n');
+    assert.match(all, /semester\.start" is not a real calendar date/);
+    assert.match(all, /semester\.weeks" must be a whole number/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(bad, { recursive: true, force: true });
+  }
+});
+
+test('timeline: one line with week headers, today in the middle, quiet empty weeks', async () => {
+  const { timelineView, teachingWeek, relativeWeek, relativeDay, rangeLabel } = await import('../src/js/timeline.js');
+  const semester = { start: '2026-09-14', weeks: 14 };
+  assert.equal(teachingWeek(semester, '2026-09-14'), 1);
+  assert.equal(teachingWeek(semester, '2026-11-22'), 10);
+  assert.equal(teachingWeek(semester, '2026-12-21'), null, 'after the last teaching week');
+  assert.equal(teachingWeek(null, '2026-11-22'), null);
+  assert.equal(relativeWeek('2026-11-16', '2026-11-14'), 'Next week');
+  assert.equal(relativeWeek('2026-10-26', '2026-11-14'), '2 weeks ago');
+  assert.equal(relativeDay('2026-11-17', '2026-11-14'), 'in 3 days');
+  assert.equal(relativeDay('2026-12-15', '2026-11-14'), '');
+  assert.equal(rangeLabel('2026-11-16', '2026-11-22'), '16–22 Nov');
+  assert.equal(rangeLabel('2026-11-30', '2026-12-06'), '30 Nov – 6 Dec');
+
+  const meeting = (id, date, extra = {}) => ({
+    id, title: `Meeting ${id}`, date, time: '14:00', duration: 60, questions: [], decisions: [], summary_html: '', ...extra,
+  });
+  const site = {
+    course: { name: 'T', semester },
+    meetings: [
+      meeting('kickoff', '2026-09-15', { summary_html: '<p>Roles.</p>', decisions: [{ decision_html: '<p>Rotate sheets.</p>' }] }),
+      meeting('late', '2026-11-17', { questions: [{ id: 'q' }, { id: 'r' }] }),
+      meeting('retro', '2026-12-15', { draft: true }),
+      meeting('someday', '', { time: undefined }),
+    ],
+  };
+  const body = String(timelineView(site, { today: '2026-11-14' }).body);
+  // Months in order, oldest at the top (October is inside the merged quiet weeks).
+  const months = [...body.matchAll(/class="tl-month[^"]*">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(months, ['September', 'November', 'December']);
+  assert.match(body, /Week 10<\/span>[\s\S]*?16–22 Nov <span class="tl-relweek">· Next week/);
+  assert.match(body, /id="tl-today"/);
+  assert.match(body, /Weeks 2–8<\/span>[\s\S]*?21 Sept? – 8 Nov <span class="tl-relweek">· nothing on/, 'empty past weeks merge into one line');
+  assert.match(body, /nothing planned yet/, 'empty future weeks too');
+  // This week and the next two: every day; Wed 25 Nov has nothing but still shows.
+  assert.match(body, /tl-dayrow[^>]*>\s*<span class="tl-date">Wed 25</);
+  assert.doesNotMatch(body, /tl-dayrow[^>]*>\s*<span class="tl-date">Wed 9</, 'far from today only days with something on');
+  // Items and their sheets.
+  assert.match(body, /data-open="late"[\s\S]*?in 3 days[\s\S]*?14:00–15:00 · 2 questions/);
+  assert.match(body, /is-done" data-open="kickoff"[\s\S]*?1 decision/);
+  assert.match(body, /Meeting · Draft/);
+  assert.match(body, /data-sheet="kickoff"[\s\S]*?Rotate sheets[\s\S]*?href="#\/m\/kickoff">Open meeting/);
+  assert.match(body, /No time set yet: <a href="#\/m\/someday">/);
+  assert.doesNotMatch(body, /style=/, 'no inline styles (the security policy forbids them)');
+});

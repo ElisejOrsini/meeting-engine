@@ -34,7 +34,7 @@ listed with its file name. Unknown keys are errors, so typos are caught.
   (pdf, png, jpg, jpeg, gif, webp, csv, txt); anything else gives a warning.
   Symbolic links are not allowed.
 - **Markdown** is GitHub-flavoured. Raw HTML is shown as text, not rendered.
-  Links may be `https://…`, `mailto:…`, another page of the site (`#/decisions`)
+  Links may be `https://…`, `mailto:…`, another page of the site (`#/timeline`)
   or an attachment in the same meeting folder (`[slides](slides.pdf)`); a link
   to an attachment that doesn't exist is an error. Other links (`#section`,
   `/path`, `javascript:`) are shown as plain text. Headings are fine: `#` in a
@@ -58,6 +58,9 @@ links:                            # optional, shown on the start page
 home:                             # optional, a link at the start of the header, on every page
   title: Public site              # required
   url: ../                        # required, https://… or a path on the same website (../, /…)
+semester:                         # optional, for "Week 10" on the timeline
+  start: 2026-09-14               # required, the Monday of teaching week 1
+  weeks: 14                       # optional, number of teaching weeks (default 14)
 
 backend:                          # optional: GitHub sign-in (and later survey answers)
   url: https://abcdefghijklmnopqrst.supabase.co   # required, the Supabase Project URL
@@ -163,4 +166,5 @@ tab once the meeting has happened.
 
 Free Markdown. A good summary has who attended, what was discussed, and action
 items (who does what, by when). Decisions belong in `decisions.yml`, not only in
-the summary, so they show up on the Decisions page.
+the summary, so they show up on the meeting's Post-meeting tab and in its sheet
+on the timeline.
