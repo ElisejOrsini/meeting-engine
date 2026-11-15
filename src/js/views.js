@@ -392,7 +392,16 @@ function postTab(meeting, today) {
     ${happened && (open.length || listedOpen.length) ? section('Still open', html`
       <ul class="question-list">${listedOpen.map((o) => {
         const q = o.question && questionById(meeting, o.question);
-        return html`<li>${q ? html`<a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a>: ` : ''}${raw(o.text_html)}${o.next_html ? html` <span class="muted">Next: ${raw(o.next_html)}</span>` : ''}</li>`;
+        // A written open point: its text first, then (small) the question it
+        // belongs to and what happens next. Not a row link: the text may hold links.
+        const meta = [
+          q && html`<a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a>`,
+          o.next_html && html`<span>Next: ${raw(o.next_html)}</span>`,
+        ].filter(Boolean);
+        return html`<li class="open-item">
+          <div class="open-item-text">${raw(o.text_html)}</div>
+          ${meta.length ? html`<div class="open-item-meta">${meta}</div>` : ''}
+        </li>`;
       })}${open.map((q) => html`
         <li><a href="${link('m', meeting.id, 'pre')}?focus=${encodeURIComponent(q.id)}">${q.text}</a></li>`)}</ul>`) : ''}`;
 }
