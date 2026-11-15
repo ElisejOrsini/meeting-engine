@@ -154,12 +154,26 @@ the answers are deleted (30 days after the meeting).
    `#/timeline`, old `#/decisions` links lead there; new optional
    `semester: { start, weeks }` in course.yml for the "Week 10" labels)*
 4. **v0.8.0 Scheduling** (availability windows and grid, DB part 5).
-   *(built 14 Nov, not released yet: `supabase/migrations/20261114180000_scheduling.sql`,
+   *(released 14–15 Nov as v0.8.0/v0.8.1: `supabase/migrations/20261114180000_scheduling.sql`,
    `src/js/schedule.js`, `src/js/calendar.js`. Decided 14 Nov: the agent sees
    names in availability; meetings added on the site are visible at once;
    after "Pick", organizers get "Send Outlook invite" (a prefilled Outlook
    event, sent from their own mailbox) and everyone "Add to calendar".)*
-5. **v0.9.0 Tasks and check-ins.**
+5. **v0.9.0 Tasks and check-ins.** Decided 15 Nov:
+   - **Who:** pick people from the team list, or Everyone. Check-ins get the
+     same "who should write" list (e.g. one person per project pair), so
+     "Not written yet" only lists the people it is meant for.
+   - **Next steps** of a meeting with a real due date become **suggested
+     tasks** on the timeline, only for organizers, who add (choosing who) or
+     dismiss each one.
+   - **Agent-made tasks and check-ins** start as drafts, like its meetings;
+     an organizer publishes them. Tasks and check-ins added on the site are
+     visible at once.
+   - **The agent sees names** in check-in updates (like the team).
+   - Database part 6. Updates are deleted 60 days after the check-in's due
+     date (nightly); the check-in itself stays on the timeline as history.
+   - *(released 15 Nov: `supabase/migrations/20261115120000_tasks_checkins.sql`,
+     `src/js/items.js`; preview with `npm run dev:example`.)*
 
 Each release: tests, preview on `private-local`, your OK, then tag and push.
 

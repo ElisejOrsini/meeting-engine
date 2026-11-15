@@ -146,5 +146,37 @@ async function addExample({ db, as, rpc, courseId, file }) {
     content: { ...content, intro_md: example.summary.intro_md, items }, note: 'AI summary (example)',
   }, { agentKey });
   if (saved.status !== 200) throw new Error(`example summary: HTTP ${saved.status}: ${saved.body?.message}`);
-  return [`${example.people.length} teammates answered the survey of ${meeting}`, 'wrote the In-meeting AI summary as "OpenClaw (example)"'];
+  const lines = [`${example.people.length} teammates answered the survey of ${meeting}`, 'wrote the In-meeting AI summary as "OpenClaw (example)"'];
+
+  // Tasks and written check-ins (v0.9.0).
+  const t = example.timeline;
+  if (t) {
+    const ok = (r, what) => {
+      if (r.status >= 300) throw new Error(`example ${what}: HTTP ${r.status}: ${r.body?.message}`);
+      return r.body;
+    };
+    const uidOfLogin = (login) => uidOf(example.people.findIndex((p) => p.login === login));
+    for (const task of t.tasks ?? []) {
+      ok(await rpc('add_item', { p_course: courseId, p_kind: 'task', p_item: task }, { githubId: 1001 }), 'task');
+    }
+    for (const { updates = {}, ...checkin } of t.checkins ?? []) {
+      const added = ok(await rpc('add_item', { p_course: courseId, p_kind: 'checkin', p_item: checkin }, { githubId: 1001 }), 'check-in');
+      for (const [login, text] of Object.entries(updates)) {
+        await as('authenticated', 'select public.save_checkin_update($1, $2, $3)', [courseId, added.id, text], uidOfLogin(login));
+      }
+    }
+    for (const draft of t.drafts ?? []) {
+      ok(await rpc('agent_create_task', { title: draft.title, due: draft.due, details_md: draft.details_md ?? null }, { agentKey }), 'draft');
+    }
+    if (t.next_steps?.length) {
+      const m = ok(await rpc('agent_get_meeting', { meeting: t.next_steps_meeting }, { agentKey }), 'meeting');
+      ok(await rpc('agent_put_section', {
+        meeting: t.next_steps_meeting, part: 'post', base_version: m.post?.version ?? 0,
+        content: { ...(m.post?.content ?? {}), next_steps: [...(m.post?.content?.next_steps ?? []), ...t.next_steps] },
+        note: 'next steps (example)',
+      }, { agentKey }), 'next steps');
+    }
+    lines.push(`added ${(t.tasks ?? []).length} tasks, ${(t.checkins ?? []).length} check-in, ${(t.drafts ?? []).length} agent draft and ${(t.next_steps ?? []).length} next steps (suggested tasks)`);
+  }
+  return lines;
 }

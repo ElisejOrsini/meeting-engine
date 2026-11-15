@@ -121,10 +121,42 @@ export function toSite(data, { createMarkdown, engine, backend, semester = null 
   }
   // Newest first, like the build; meetings without a time count as upcoming.
   meetings.sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999') || a.id.localeCompare(b.id));
+  // Tasks and written check-ins (database part 6), and suggested tasks from
+  // meetings' next steps (organizers only).
+  const items = (data.items ?? []).map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    title: i.title ?? '',
+    due: i.due,
+    details_md: (i.kind === 'checkin' ? i.question_md : i.details_md) ?? '',
+    details_html: md.block((i.kind === 'checkin' ? i.question_md : i.details_md) ?? '', { headingOffset: INSIDE_CARD }),
+    everyone: i.everyone === true,
+    nobody: i.nobody === true, // everyone it was for has left the team
+    people: i.people ?? [],
+    meeting: i.meeting ?? null,
+    published: i.published !== false,
+    created_by: i.created_by ?? '',
+    for_me: i.for_me === true,
+    expected: i.expected ?? 0,
+    written: i.written ?? 0,
+    mine: i.mine === true,
+  }));
+  const suggestions = (data.suggestions ?? []).map((s) => ({
+    meeting: s.meeting,
+    meeting_title: s.meeting_title ?? s.meeting,
+    key: s.key,
+    what_md: s.what_md ?? '',
+    what_html: md.inline((s.what_md ?? '').replace(/\n+/g, ' ')),
+    owner: s.owner ?? '',
+    due: s.due,
+    people: s.people ?? [],
+  }));
   return {
     engine,
     backend,
     private: true,
+    items,
+    suggestions,
     course: {
       id: data.course?.id,
       name: data.course?.name ?? 'Meetings',

@@ -69,6 +69,14 @@ Sizes are in `rem`, so the reader's text-size setting scales everything.
 | `--green` / `--green-tint` | `#1a7330` / 0.12 | `#30d158` / 0.18 | "Decided", decisions |
 | `--orange` / `--orange-tint` | `#a54a00` / 0.12 | `#ff9f0a` / 0.18 | "Summary pending", warnings |
 
+| `--c-checkin` / `-tint` | `#8a3fb3` / 0.12 | `#d08bf5` / 0.2 | timeline: written check-in icon and label |
+| `--c-task` / `-tint` | `#00757a` / 0.12 | `#5fd9d2` / 0.16 | timeline: task icon and label |
+
+**Exception to "one accent":** the timeline's written check-ins (purple) and
+tasks (teal) have their own colour, only for their icon chip and their small
+kind label, so the four kinds can be told apart at a glance. They are never
+used for buttons, links or text otherwise. (5.0–12.3:1 on every background.)
+
 Text colours meet WCAG AA (4.5:1) on `--bg` and `--surface` in both modes.
 Links in running text are underlined (blue alone isn't distinct enough from
 black text); navigation links and buttons are not.
@@ -178,6 +186,21 @@ black text); navigation links and buttons are not.
   chevron) that opens its grid on the timeline. Its page shows an
   `--accent-tint` notice under the facts with the same button (primary,
   small).
+- **Tasks and written check-ins** on the timeline: a flag in a rounded-square
+  teal chip, or a speech bubble in a round purple chip; the kind label above
+  the title in the same colour; past ones grey. A task for you (not
+  everyone) has a thin teal bar on the left of its card. A check-in that asks
+  you has "Write your update" / "Change your update". Drafts say "· Draft".
+  **Suggested tasks** (organizers only): a dashed chip and a dashed,
+  transparent card, "Suggested task · organizers". A small legend of the
+  four kinds sits under the Timeline title.
+- **Task / check-in sheets:** facts ("Due Thu 19 Nov · Mia"), the details or
+  the question, "Agreed in <meeting>"; for check-ins "2 of 4 written", your
+  box (Post update / Save changes / Remove my update), everyone's updates with
+  name and day, "Not written yet: …". Organizers: Publish (drafts), Edit
+  (the same fields inline), Delete (asks once more).
+- **"Who" picker:** a grouped checkbox list, "Everyone" first (it switches the
+  people off), then the team by name.
 - **"+ Add"** (organizers, small secondary button next to the Timeline title):
   a sheet with "Find a time for a meeting" or "Meeting with a fixed time".
 - **Calendar actions** under a meeting's facts, for meetings still ahead:

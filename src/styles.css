@@ -25,6 +25,12 @@
   --text-2-on-tint: #5c5c61; /* secondary text on --accent-tint (AA) */
   --accent-on-tint: #005bb8; /* accent text on --accent-tint (AA) */
   --chart-other: color-mix(in srgb, var(--accent-fill) 45%, var(--surface-2)); /* bars that aren't the leading option */
+  /* Two colours beyond the accent, only for the timeline's check-in and task
+     icons and kind labels (AA on --bg, --surface and --surface-2). */
+  --c-checkin: #8a3fb3;
+  --c-checkin-tint: rgb(138 63 179 / 0.12);
+  --c-task: #00757a;
+  --c-task-tint: rgb(0 117 122 / 0.12);
   --header: rgb(255 255 255 / 0.72);
   --segment: #ffffff;
   --segment-shadow: 0 3px 8px rgb(0 0 0 / 0.12), 0 3px 1px rgb(0 0 0 / 0.04);
@@ -59,6 +65,10 @@
     --text-2-on-tint: var(--text-2);
     --accent-on-tint: var(--accent);
     --chart-other: color-mix(in srgb, var(--accent-fill) 65%, var(--surface-2));
+    --c-checkin: #d08bf5;
+    --c-checkin-tint: rgb(191 90 242 / 0.2);
+    --c-task: #5fd9d2;
+    --c-task-tint: rgb(95 217 210 / 0.16);
     --header: rgb(28 28 30 / 0.72);
     --segment: #636366;
     --segment-shadow: 0 3px 8px rgb(0 0 0 / 0.3);
@@ -559,7 +569,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 
 .sheet-header { display: flex; align-items: flex-start; gap: 16px; padding: 22px 20px 14px 24px; }
 .sheet-heading { flex: 1; min-width: 0; }
-.sheet-title { margin: 0; font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.012em; }
+.sheet-title { margin: 0; font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.012em; overflow-wrap: anywhere; }
 .sheet-title:focus { outline: none; }
 .sheet-close {
   position: relative;
@@ -782,6 +792,9 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   color: var(--chip);
   background: var(--chip-tint);
 }
+.chip-checkin { --chip: var(--c-checkin); --chip-tint: var(--c-checkin-tint); }
+.chip-task, .chip-suggestion { --chip: var(--c-task); --chip-tint: var(--c-task-tint); border-radius: 8px; }
+.chip-suggestion { background: var(--surface); outline: 1.5px dashed var(--c-task); outline-offset: -1.5px; }
 .chip.is-past { --chip: var(--text-2); --chip-tint: var(--fill); }
 .tl-rail .chip { box-shadow: 0 0 0 4px var(--bg); }
 
@@ -841,8 +854,16 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 .tl-item.is-upcoming:hover .tl-card { background: color-mix(in srgb, var(--surface), var(--text) 3%); }
 .tl-item:active .tl-card { transform: scale(0.98); }
 .tl-kind { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em; color: var(--c-meeting); }
+.kind-checkin .tl-kind { color: var(--c-checkin); }
+.kind-task .tl-kind, .kind-suggestion .tl-kind { color: var(--c-task); }
 .tl-item.is-done .tl-kind { color: var(--text-2); }
-.tl-title { font-weight: 600; line-height: 1.3; }
+.tl-item.kind-suggestion .tl-card, .tl-item.kind-suggestion:hover .tl-card { background: transparent; border: 1.5px dashed var(--separator); }
+.tl-item.is-mine.is-upcoming .tl-card { box-shadow: inset 3px 0 0 var(--c-task); }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 4px; color: var(--text-2); font-size: 0.8125rem; }
+.tl-legend > span { display: inline-flex; align-items: center; gap: 7px; }
+.tl-legend .chip { width: 22px; height: 22px; }
+.tl-legend .chip svg { width: 12px; height: 12px; }
+.tl-title { font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .tl-item.is-done .tl-title { font-weight: 500; }
 .tl-sub { font-size: 0.875rem; color: var(--text-2); }
 
@@ -1043,6 +1064,19 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 }
 .notice-schedule p { flex: 1 1 260px; margin: 0; }
 
+/* Tasks and check-ins: the "who" picker, organizers' actions, updates */
+.who-picker .options { max-height: 15rem; overflow-y: auto; }
+.item-organizer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.item-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 8px; }
+.item-edit { margin-top: 16px; }
+.item-edit .field, .tl-add .field { margin-bottom: 18px; }
+.item-edit[hidden] { display: none; }
+textarea.text-input { min-height: 88px; resize: vertical; }
+.checkin-question { margin: 0 0 8px; font-size: 1.0625rem; }
+.checkin-count { margin: 12px 0 16px; font-weight: 600; }
+.checkin-form { margin-bottom: 8px; }
+.checkin-updates { margin-top: 4px; }
+
 /* Calendar actions on a meeting page */
 .calendar-actions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 6px 0 0; }
 
@@ -1120,6 +1154,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   .av-grid-all .av-cell { forced-color-adjust: none; background: color-mix(in srgb, Highlight var(--p), Canvas); }
   .av-legend-bar { forced-color-adjust: none; background: linear-gradient(to right, Canvas, Highlight); border: 1px solid CanvasText; }
   .av-cell:focus-visible { outline-color: Highlight; }
+  .chip { forced-color-adjust: none; color: CanvasText; background: Canvas; border: 1px solid CanvasText; }
 }
 
 /* ---------- private courses: drafts, notes, next steps, Team page ---------- */

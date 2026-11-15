@@ -499,3 +499,44 @@ test('views: a meeting still finding a time asks for your availability and links
   const mine = String(meetingsView({ ...site, meetings: [{ ...meeting, schedule: { ...meeting.schedule, mine: true } }] }, '2026-11-15').body);
   assert.match(mine, /Change your availability/);
 });
+
+test('timeline: tasks, check-ins and suggested tasks (rows, sheets, who)', async () => {
+  const { timelineView } = await import('../src/js/timeline.js');
+  const { whoText, plainText } = await import('../src/js/items.js');
+  const site = {
+    private: true,
+    course: { id: 'c', name: 'T' },
+    me: { login: 'alice', organizer: true },
+    members: [{ login: 'alice', name: 'Alice' }, { login: 'bob', name: 'Bob' }],
+    meetings: [],
+    items: [
+      { id: 't1', kind: 'task', title: 'Upload sheet 9', due: '2026-11-19', details_html: '', everyone: false, people: ['bob', 'alice'],
+        published: true, for_me: true, expected: 0, written: 0 },
+      { id: 'c1', kind: 'checkin', title: 'Project status', due: '2026-11-20', details_html: '<p>How is it going?</p>', everyone: true,
+        people: [], published: true, for_me: true, expected: 2, written: 1, mine: false },
+      { id: 'd1', kind: 'task', title: 'Book a room', due: '2026-11-25', details_html: '', everyone: true, people: [], published: false },
+    ],
+    suggestions: [
+      { meeting: 'm1', meeting_title: 'Retro', key: 'aaaaaaaaaaaaaaaa', what_md: 'Upload to [Moodle](https://moodle.example/x)', owner: 'bob', due: '2026-11-18', people: ['bob'] },
+      { meeting: 'm2', meeting_title: 'Other', key: 'aaaaaaaaaaaaaaaa', what_md: 'Same step', owner: '', due: '2026-11-18', people: [] },
+    ],
+  };
+  assert.equal(whoText(site, site.items[0]), 'You and Bob');
+  assert.equal(whoText(site, { everyone: false, people: [] }), 'Nobody (they left the team)');
+  assert.equal(plainText('Upload to [Moodle](https://x) **now**'), 'Upload to Moodle now');
+  const body = String(timelineView(site, { today: '2026-11-15' }).body);
+  assert.match(body, /data-open="item-t1"[\s\S]*?Task<\/span>[\s\S]*?Upload sheet 9[\s\S]*?You and Bob/);
+  assert.match(body, /data-open="item-c1"[\s\S]*?Written check-in[\s\S]*?Everyone · 1 of 2 written[\s\S]*?Write your update/);
+  assert.match(body, /Task · Draft[\s\S]*?Book a room/);
+  assert.match(body, /data-sheet="item-c1" data-item="c1" data-checkin="c1"/);
+  // Suggested tasks: plain text in the row (no links inside the button), unique field ids.
+  const row = body.slice(body.indexOf('data-open="suggest-m1-'), body.indexOf('</button>', body.indexOf('data-open="suggest-m1-')));
+  assert.doesNotMatch(row, /<a /);
+  assert.match(row, /Upload to Moodle/);
+  assert.match(body, /id="s-m1-aaaaaaaaaaaaaaaa-title"/);
+  assert.match(body, /id="s-m2-aaaaaaaaaaaaaaaa-title"/);
+  assert.match(body, /<legend>Who<\/legend>[\s\S]*?id="add-task-everyone"/);
+  assert.doesNotMatch(String(timelineView({ ...site, me: { login: 'bob', organizer: false } }, { today: '2026-11-15' }).body), /Suggested task/,
+    'suggestions are for organizers');
+  assert.doesNotMatch(body, /style=/);
+});

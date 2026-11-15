@@ -2,56 +2,154 @@
   "about": "Preview only (npm run dev:example): ten made-up teammates answer the survey of the demo meeting \"Late submission policy\", and \"summary\" is the In-meeting part an agent (OpenClaw) would write from their answers 30 minutes before the meeting. It shows what the In-meeting tab looks like with a real AI summary. Nothing here is real.",
   "meeting": "2026-11-17-late-submissions",
   "people": [
-    { "login": "mia-preview", "name": "Mia" },
-    { "login": "jonas-preview", "name": "Jonas" },
-    { "login": "lea-preview", "name": "Lea" },
-    { "login": "noah-preview", "name": "Noah" },
-    { "login": "sara-preview", "name": "Sara" },
-    { "login": "luca-preview", "name": "Luca" },
-    { "login": "nina-preview", "name": "Nina" },
-    { "login": "tim-preview", "name": "Tim" },
-    { "login": "anja-preview", "name": "Anja" },
-    { "login": "felix-preview", "name": "Felix" }
+    {
+      "login": "mia-preview",
+      "name": "Mia"
+    },
+    {
+      "login": "jonas-preview",
+      "name": "Jonas"
+    },
+    {
+      "login": "lea-preview",
+      "name": "Lea"
+    },
+    {
+      "login": "noah-preview",
+      "name": "Noah"
+    },
+    {
+      "login": "sara-preview",
+      "name": "Sara"
+    },
+    {
+      "login": "luca-preview",
+      "name": "Luca"
+    },
+    {
+      "login": "nina-preview",
+      "name": "Nina"
+    },
+    {
+      "login": "tim-preview",
+      "name": "Tim"
+    },
+    {
+      "login": "anja-preview",
+      "name": "Anja"
+    },
+    {
+      "login": "felix-preview",
+      "name": "Felix"
+    }
   ],
   "answers": {
     "mia-preview": {
-      "grace-period": { "preference": "1 hour", "reason": "Most late uploads I saw were upload timeouts a few minutes after midnight. One hour covers that without inviting people to start late." },
-      "penalty": { "options": ["10% deduction per day"] }
+      "grace-period": {
+        "preference": "1 hour",
+        "reason": "Most late uploads I saw were upload timeouts a few minutes after midnight. One hour covers that without inviting people to start late."
+      },
+      "penalty": {
+        "options": [
+          "10% deduction per day"
+        ]
+      }
     },
     "jonas-preview": {
-      "grace-period": { "preference": "15 minutes", "reason": "15 minutes is enough for upload hiccups. An hour just moves the deadline to 1 am." },
-      "penalty": { "options": ["Not accepted at all", "Decided case by case by the head TA"] }
+      "grace-period": {
+        "preference": "15 minutes",
+        "reason": "15 minutes is enough for upload hiccups. An hour just moves the deadline to 1 am."
+      },
+      "penalty": {
+        "options": [
+          "Not accepted at all",
+          "Decided case by case by the head TA"
+        ]
+      }
     },
     "lea-preview": {
-      "grace-period": { "preference": "1 hour", "reason": "Exchange students in other time zones had trouble with the exact cut-off. One hour is a fair buffer, as long as it is announced clearly." },
-      "penalty": { "options": ["10% deduction per day", "Decided case by case by the head TA"] }
+      "grace-period": {
+        "preference": "1 hour",
+        "reason": "Exchange students in other time zones had trouble with the exact cut-off. One hour is a fair buffer, as long as it is announced clearly."
+      },
+      "penalty": {
+        "options": [
+          "10% deduction per day",
+          "Decided case by case by the head TA"
+        ]
+      }
     },
     "noah-preview": {
-      "grace-period": { "preference": "24 hours", "reason": "Several students in my group work part-time. A 24-hour window, no questions asked, would replace most of the extension emails." },
-      "penalty": { "options": ["Accepted but only graded pass/fail"] }
+      "grace-period": {
+        "preference": "24 hours",
+        "reason": "Several students in my group work part-time. A 24-hour window, no questions asked, would replace most of the extension emails."
+      },
+      "penalty": {
+        "options": [
+          "Accepted but only graded pass/fail"
+        ]
+      }
     },
     "sara-preview": {
-      "grace-period": { "preference": "1 hour", "reason": "1 hour is fine, but only if every group gets the same rule. Consistency matters more to students than the exact number." },
-      "penalty": { "options": ["10% deduction per day"] }
+      "grace-period": {
+        "preference": "1 hour",
+        "reason": "1 hour is fine, but only if every group gets the same rule. Consistency matters more to students than the exact number."
+      },
+      "penalty": {
+        "options": [
+          "10% deduction per day"
+        ]
+      }
     },
     "luca-preview": {
-      "grace-period": { "preference": "No grace period", "reason": "A deadline is a deadline. After two weeks, any grace period becomes the real deadline." },
-      "penalty": { "options": ["Not accepted at all"] }
+      "grace-period": {
+        "preference": "No grace period",
+        "reason": "A deadline is a deadline. After two weeks, any grace period becomes the real deadline."
+      },
+      "penalty": {
+        "options": [
+          "Not accepted at all"
+        ]
+      }
     },
     "nina-preview": {
-      "grace-period": { "preference": "1 hour" },
-      "penalty": { "options": ["10% deduction per day", "Accepted but only graded pass/fail"] }
+      "grace-period": {
+        "preference": "1 hour"
+      },
+      "penalty": {
+        "options": [
+          "10% deduction per day",
+          "Accepted but only graded pass/fail"
+        ]
+      }
     },
     "tim-preview": {
-      "grace-period": { "preference": "15 minutes", "reason": "Keep the grace period short and for technical problems only. Anything longer should go through an extension request." },
-      "penalty": { "options": ["Decided case by case by the head TA"] }
+      "grace-period": {
+        "preference": "15 minutes",
+        "reason": "Keep the grace period short and for technical problems only. Anything longer should go through an extension request."
+      },
+      "penalty": {
+        "options": [
+          "Decided case by case by the head TA"
+        ]
+      }
     },
     "anja-preview": {
-      "grace-period": { "preference": "24 hours", "reason": "24 hours would save us many individual emails, and we only start grading two days later anyway." },
-      "penalty": { "options": ["Accepted but only graded pass/fail", "Decided case by case by the head TA"] }
+      "grace-period": {
+        "preference": "24 hours",
+        "reason": "24 hours would save us many individual emails, and we only start grading two days later anyway."
+      },
+      "penalty": {
+        "options": [
+          "Accepted but only graded pass/fail",
+          "Decided case by case by the head TA"
+        ]
+      }
     },
     "felix-preview": {
-      "grace-period": { "preference": "1 hour" },
+      "grace-period": {
+        "preference": "1 hour"
+      },
       "penalty": "skip"
     }
   },
@@ -82,5 +180,61 @@
         "short": "Who approves extensions, and how fast?"
       }
     }
+  },
+  "timeline": {
+    "about": "Tasks and written check-ins on the timeline (v0.9.0). 'tasks' and 'checkins' are added by the pretend organizer; 'drafts' by the pretend agent; 'next_steps' go into the October meeting's Post-meeting part and show up as suggested tasks for organizers.",
+    "tasks": [
+      {
+        "title": "Upload exercise sheet 9",
+        "due": "2026-11-19",
+        "people": [
+          "mia-preview"
+        ],
+        "details_md": "Solutions go up after the Friday sessions."
+      },
+      {
+        "title": "Draft exam questions",
+        "due": "2026-12-04",
+        "people": "everyone",
+        "details_md": "Two questions each, with a short solution, in the shared exam folder."
+      }
+    ],
+    "checkins": [
+      {
+        "title": "Project status",
+        "due": "2026-11-20",
+        "people": [
+          "mia-preview",
+          "lea-preview",
+          "sara-preview",
+          "nina-preview"
+        ],
+        "question_md": "How is your project pair doing? Recent developments, and what you're working on next.",
+        "updates": {
+          "mia-preview": "Group B is on track. Two groups still struggle with the data loader; I'll run an extra office hour on Thursday.",
+          "lea-preview": "Fine overall. Group 7 wants to change its topic; we should decide before the 27th."
+        }
+      }
+    ],
+    "drafts": [
+      {
+        "title": "Book a room for the exam review",
+        "due": "2026-11-25",
+        "details_md": "About 120 students; HG E 3 or similar."
+      }
+    ],
+    "next_steps_meeting": "2026-10-27-exercise-sessions",
+    "next_steps": [
+      {
+        "what_md": "Send the rules on recording sessions to all TAs",
+        "owner": "you-in-preview",
+        "due": "2026-11-18"
+      },
+      {
+        "what_md": "Collect everyone's recap slides in the course drive",
+        "owner": "all TAs",
+        "due": "2026-11-24"
+      }
+    ]
   }
 }

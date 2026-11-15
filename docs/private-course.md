@@ -19,7 +19,7 @@ What you need first:
 
 ## 1. Update the database (once per Supabase project, per engine release)
 
-Private courses need parts 3, 4 and 5 of the database setup, run in this order:
+Private courses need parts 3 to 6 of the database setup, run in this order:
 
 - part 3: [`20261112120000_private_content.sql`](../supabase/migrations/20261112120000_private_content.sql)
 - part 4 (engine v0.6.0, In-meeting tab):
@@ -28,6 +28,8 @@ Private courses need parts 3, 4 and 5 of the database setup, run in this order:
   [`20261114180000_scheduling.sql`](../supabase/migrations/20261114180000_scheduling.sql).
   Use the file from v0.8.1 or later: the v0.8.0 file fails on Supabase with
   "dependent privileges exist" (and changes nothing); just run the newer one.
+- part 6 (engine v0.9.0, tasks and written check-ins on the timeline):
+  [`20261115120000_tasks_checkins.sql`](../supabase/migrations/20261115120000_tasks_checkins.sql)
 
 For each file:
 

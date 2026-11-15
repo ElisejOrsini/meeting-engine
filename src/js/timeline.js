@@ -20,6 +20,10 @@
 import { html, raw, link } from './dom.js';
 import { localToday, meetingFacts, timeRange, plural, daysLabel } from './views.js';
 import { openSchedule } from './schedule.js';
+import {
+  taskSheet, checkinSheet, suggestionSheet, itemSheetId, suggestionSheetId, itemSubtitle, itemFields,
+  readItemFields, wireWhoPickers, wireItemActions, openCheckin, nameOf, plainText, announce,
+} from './items.js';
 import { zurichToDate } from './calendar.js';
 
 const DAY_MS = 864e5;
@@ -77,18 +81,26 @@ export function relativeDay(date, today) {
 const ICONS = {
   meeting: raw('<circle cx="6" cy="5.6" r="2.2"/><path d="M2.2 13.2c0-2.2 1.7-3.8 3.8-3.8s3.8 1.6 3.8 3.8"/><circle cx="11.3" cy="6.3" r="1.7"/><path d="M11.2 9.5c1.8 0 3 1.4 3 3.3"/>'),
   window: raw('<circle cx="8" cy="8" r="5.8"/><path d="M8 4.9V8l2.1 1.5"/>'),
+  checkin: raw('<path d="M3.2 3h9.6c.6 0 1 .4 1 1v6.2c0 .6-.4 1-1 1H7.2L4.4 13.6v-2.4H3.2c-.6 0-1-.4-1-1V4c0-.6.4-1 1-1z"/><path d="M5 6.1h6M5 8.3h3.8"/>'),
+  task: raw('<path d="M4 14.2V2.4"/><path d="M4 2.9h8l-1.8 2.7L12 8.4H4"/>'),
 };
+ICONS.suggestion = ICONS.task;
 function chip(kind, past) {
   return html`<span class="chip chip-${kind} ${past ? 'is-past' : 'is-upcoming'}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[kind]}</svg></span>`;
 }
 
 export { daysLabel };
 
-// What the line shows: meetings with a date, and meetings still finding a
-// time ("planned"), which sit on the first day of their grid.
+// What the line shows: meetings with a date, meetings still finding a time
+// ("planned", on the first day of their grid), tasks and written check-ins
+// (on their due date) and, for organizers, suggested tasks.
 function itemsOf(site) {
   const members = site.members?.length ?? 0;
   const items = [];
+  for (const item of site.items ?? []) items.push({ kind: item.kind, item, date: item.due });
+  if (site.me?.organizer === true) {
+    for (const s of site.suggestions ?? []) items.push({ kind: 'suggestion', suggestion: s, date: s.due });
+  }
   for (const meeting of site.meetings) {
     const s = meeting.schedule;
     if (s?.days?.length) {
@@ -97,7 +109,9 @@ function itemsOf(site) {
       items.push({ kind: 'meeting', meeting, date: meeting.date });
     }
   }
-  return items.sort((a, b) => a.date.localeCompare(b.date) || (a.meeting.time ?? '').localeCompare(b.meeting.time ?? ''));
+  const order = { window: 0, meeting: 1, checkin: 2, task: 3, suggestion: 4 };
+  return items.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind]
+    || (a.meeting?.time ?? '').localeCompare(b.meeting?.time ?? ''));
 }
 
 function meetingSubtitle(meeting, past) {
@@ -107,7 +121,41 @@ function meetingSubtitle(meeting, past) {
   return meeting.summary_html ? 'Summary written' : 'Summary pending';
 }
 
-function itemRow(item, { today, showDate }) {
+// A task, check-in or suggested task on the line.
+function otherRow(site, entry, { today, showDate }) {
+  const past = entry.date < today;
+  const rel = relativeDay(entry.date, today);
+  const date = html`<span class="tl-date">${showDate ? html`<span class="tl-wd">${dayLabel(entry.date)}</span>${rel ? html`<span class="tl-rel">${rel}</span>` : ''}` : ''}</span>`;
+  if (entry.kind === 'suggestion') {
+    const s = entry.suggestion;
+    return html`
+      <button type="button" class="tl-item tl-row ${past ? 'is-past' : 'is-future'} kind-suggestion is-upcoming" data-open="${suggestionSheetId(s)}" aria-haspopup="dialog">
+        ${date}
+        <span class="tl-rail">${chip('suggestion', false)}</span>
+        <span class="tl-card">
+          <span class="tl-kind">Suggested task · organizers</span>
+          <span class="tl-title">${plainText(s.what_md)}</span>
+          <span class="tl-sub">From ${s.meeting_title}${s.people.length ? ` · ${s.people.map((l) => nameOf(site, l)).join(', ')}` : s.owner ? ` · ${s.owner}` : ''}</span>
+        </span>
+      </button>`;
+  }
+  const { item } = entry;
+  const write = item.kind === 'checkin' && item.published && item.for_me && !past;
+  return html`
+    <button type="button" class="tl-item tl-row ${past ? 'is-past' : 'is-future'} kind-${item.kind} ${past ? 'is-done' : 'is-upcoming'}${item.for_me && item.kind === 'task' && !item.everyone ? ' is-mine' : ''}" data-open="${itemSheetId(item)}" aria-haspopup="dialog">
+      ${date}
+      <span class="tl-rail">${chip(item.kind, past)}</span>
+      <span class="tl-card">
+        <span class="tl-kind">${item.kind === 'checkin' ? 'Written check-in' : 'Task'}${item.published ? '' : ' · Draft'}</span>
+        <span class="tl-title">${item.title}</span>
+        <span class="tl-sub">${itemSubtitle(site, item)}</span>
+        ${write ? html`<span class="tl-cta">${item.mine ? 'Change your update' : 'Write your update'}</span>` : ''}
+      </span>
+    </button>`;
+}
+
+function itemRow(item, { today, showDate, site }) {
+  if (!item.meeting) return otherRow(site, item, { today, showDate });
   const { meeting } = item;
   const planned = item.kind === 'window';
   const past = (planned ? item.end : item.date) < today;
@@ -191,7 +239,7 @@ function plannedSheet(meeting) {
 
 // "+ Add" for organizers: a meeting that still has to find a time, or one
 // with a fixed time. Both are visible to the team at once.
-function addSheet(today) {
+function addSheet(site, today) {
   const monday = addDays(weekStartOf(today), 7);
   return html`
     <dialog class="sheet tl-sheet" data-sheet="__add" aria-labelledby="tl-title-add">
@@ -203,12 +251,18 @@ function addSheet(today) {
             <div class="options">
               <label class="option"><input type="radio" name="kind" value="find" checked> <span>Find a time for a meeting</span></label>
               <label class="option"><input type="radio" name="kind" value="fixed"> <span>Meeting with a fixed time</span></label>
+              <label class="option"><input type="radio" name="kind" value="task"> <span>Task</span></label>
+              <label class="option"><input type="radio" name="kind" value="checkin"> <span>Written check-in</span></label>
             </div>
           </fieldset>
-          <div class="field">
-            <label for="add-title">Title</label>
-            <input id="add-title" name="title" class="text-input" maxlength="200" autocomplete="off" placeholder="e.g. Exam preparation">
+          <div data-for="find fixed">
+            <div class="field">
+              <label for="add-title">Title</label>
+              <input id="add-title" name="title" class="text-input" maxlength="200" autocomplete="off" placeholder="e.g. Exam preparation">
+            </div>
           </div>
+          <div data-for="task" hidden>${itemFields(site, 'task', 'add-task', { due: monday })}</div>
+          <div data-for="checkin" hidden>${itemFields(site, 'checkin', 'add-checkin', { due: addDays(monday, 4) })}</div>
           <div data-for="find">
             <div class="add-row">
               <div class="field"><label for="add-from">First day</label><input id="add-from" name="from" type="date" class="text-input" value="${monday}" min="${today}"></div>
@@ -227,7 +281,7 @@ function addSheet(today) {
             </div>
             <div class="field"><label for="add-place">Place <span class="muted">(optional)</span></label><input id="add-place" name="place" class="text-input" maxlength="300" autocomplete="off" placeholder="e.g. HG E 33 and Zoom"></div>
           </div>
-          <div class="field">
+          <div class="field" data-for="find fixed">
             <label for="add-length">Length</label>
             <select id="add-length" name="duration" class="text-input">
               <option value="30">30 minutes</option>
@@ -246,7 +300,7 @@ function addSheet(today) {
 }
 
 /** The rows of the line, from `start` to `end`, with month headings. */
-function lineRows(items, { today, semester, start, end }) {
+function lineRows(items, { today, semester, start, end, site }) {
   const byDate = new Map();
   const busy = new Set(); // days with something on (all days of a planned meeting's grid)
   for (const item of items) {
@@ -316,7 +370,7 @@ function lineRows(items, { today, semester, start, end }) {
           </div>`]);
       }
       list.forEach((item, n) => {
-        const row = itemRow(item, { today, showDate: n === 0 && d !== today });
+        const row = itemRow(item, { today, showDate: n === 0 && d !== today, site });
         // Far from today a planned meeting has no day rows: shade just its row.
         rows.push([d, item.kind === 'window' && !isDetailWeek(ws)
           ? html`<div class="tl-span"><span class="tl-span-end">until ${dayLabel(item.end)}</span>${row}</div>` : row]);
@@ -370,11 +424,23 @@ export function timelineView(site, { today = localToday() } = {}) {
         <h1 tabindex="-1">Timeline</h1>
         ${organizer ? html`<button type="button" class="button button-small" data-open="__add" aria-haspopup="dialog">+ Add</button>` : ''}
       </div>
+      <p class="tl-legend" aria-hidden="true">
+        <span>${chip('meeting', false)}Meeting</span>
+        <span>${chip('window', false)}Finding a time</span>
+        <span>${chip('checkin', false)}Written check-in</span>
+        <span>${chip('task', false)}Task</span>
+      </p>
       ${undated.length ? html`
         <p class="muted small tl-undated">No time set yet: ${undated.map((m, i) => html`${i ? ', ' : ''}<a href="${link('m', m.id)}">${m.title}</a>`)}</p>` : ''}
-      <div class="tl">${lineRows(items, { today, semester, start, end })}</div>
-      ${items.map((it) => (it.kind === 'window' ? plannedSheet(it.meeting) : meetingSheet(it.meeting, today)))}
-      ${organizer ? addSheet(today) : ''}`,
+      <div class="tl">${lineRows(items, { today, semester, start, end, site })}</div>
+      ${items.map((it) => {
+        if (it.kind === 'window') return plannedSheet(it.meeting);
+        if (it.kind === 'meeting') return meetingSheet(it.meeting, today);
+        if (it.kind === 'task') return taskSheet(site, it.item);
+        if (it.kind === 'checkin') return checkinSheet(site, it.item);
+        return suggestionSheet(site, it.suggestion);
+      })}
+      ${organizer ? addSheet(site, today) : ''}`,
   };
 }
 
@@ -413,6 +479,11 @@ export function attachTimeline(root, { site, client, reload, open } = {}) {
     if (!sheet || sheet.open) return;
     sheet.showModal();
     sheet.querySelector('.sheet-title')?.focus();
+    if (sheet.dataset.checkin) {
+      openCheckin(sheet.querySelector('[data-checkin-box]'), (site.items ?? []).find((i) => i.id === sheet.dataset.checkin), {
+        site, client, signal: stop.signal, onChange: () => { changed = true; },
+      });
+    }
     if (sheet.dataset.schedule) {
       openSchedule(sheet.querySelector('[data-av]'), meetings.get(sheet.dataset.schedule), {
         site, client, signal: stop.signal, onChange: () => { changed = true; },
@@ -444,7 +515,7 @@ export function attachTimeline(root, { site, client, reload, open } = {}) {
       // After the sheet's own close handler (schedule.js) has sent a change
       // that was still waiting. Redraw in place, focus back on the item.
       setTimeout(async () => {
-        await sheet.querySelector('[data-av]')?.pending;
+        await (sheet.querySelector('[data-av]') ?? sheet.querySelector('[data-checkin-box]'))?.pending;
         if (!stop.signal.aborted) reload({ keepView: true, focus: `[data-open="${CSS.escape(sheet.dataset.sheet)}"]` });
       }, 0);
     }, { signal: stop.signal });
@@ -452,6 +523,8 @@ export function attachTimeline(root, { site, client, reload, open } = {}) {
 
   const form = root.querySelector('form.tl-add');
   if (form) wireAddForm(form, { site, client, reload, signal: stop.signal });
+  wireWhoPickers(root, stop.signal);
+  if (site.me?.organizer === true && client) wireItemActions(root, { site, client, reload, signal: stop.signal });
 
   if (open) openSheet(open);
   detachCurrent = () => stop.abort();
@@ -461,7 +534,7 @@ function wireAddForm(form, { site, client, reload, signal }) {
   const status = form.querySelector('.survey-status');
   const sync = () => {
     const kind = form.elements.kind.value;
-    for (const el of form.querySelectorAll('[data-for]')) el.hidden = el.dataset.for !== kind;
+    for (const el of form.querySelectorAll('[data-for]')) el.hidden = !el.dataset.for.split(' ').includes(kind);
   };
   form.addEventListener('change', sync, { signal });
   sync();
@@ -473,6 +546,25 @@ function wireAddForm(form, { site, client, reload, signal }) {
       status.textContent = text;
       field?.focus();
     };
+    if (f.kind.value === 'task' || f.kind.value === 'checkin') {
+      const kind = f.kind.value;
+      const read = readItemFields(form, kind, `add-${kind}`);
+      if (read.error) return say(read.error, form.querySelector(`#${CSS.escape(read.focus)}`));
+      const button = form.querySelector('[type="submit"]');
+      button.disabled = true;
+      say('Adding…');
+      try {
+        const { data, error } = await client.rpc('add_item', { p_course: site.course.id, p_kind: kind, p_item: read.item });
+        if (error) throw new Error(error.message);
+        form.closest('dialog')?.close();
+        await reload({ keepView: true, open: `item-${data.id}` });
+        announce(kind === 'checkin' ? 'Check-in added.' : 'Task added.');
+      } catch (err) {
+        say(`Couldn’t add it: ${err.message}`);
+        button.disabled = false;
+      }
+      return undefined;
+    }
     const title = f.title.value.trim();
     if (!title) return say('Give it a title.', f.title);
     const length = Number(f.duration.value); // not "length": form.elements.length is the number of fields

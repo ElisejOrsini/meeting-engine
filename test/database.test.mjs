@@ -84,6 +84,7 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     await denied(role, 'select * from private.answers');
     await denied(role, 'select private.delete_old_answers()');
     await denied(role, 'select private.delete_old_availability()');
+    await denied(role, 'select private.delete_old_checkin_updates()');
     await denied(role, `select public.hook_before_user_created('{}'::jsonb)`);
   }
   await denied('authenticated', 'select public.keepalive()');
@@ -229,6 +230,47 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     'private.schedule_summary(private.schedules, bigint)': [],
     'private.meeting_id_for(text, date, text)': [],
     'private.delete_old_availability()': [],
+    // Part 6, tasks and check-ins: the team reads and writes updates,
+    // organizers manage items and suggestions, agents make drafts.
+    'private.get_checkin(text, text)': ['authenticated'],
+    'public.get_checkin(text, text)': ['authenticated', 'service_role'],
+    'private.save_checkin_update(text, text, text)': ['authenticated'],
+    'public.save_checkin_update(text, text, text)': ['authenticated', 'service_role'],
+    'private.add_item(text, text, jsonb)': ['authenticated'],
+    'public.add_item(text, text, jsonb)': ['authenticated', 'service_role'],
+    'private.update_item(text, text, jsonb)': ['authenticated'],
+    'public.update_item(text, text, jsonb)': ['authenticated', 'service_role'],
+    'private.delete_item(text, text)': ['authenticated'],
+    'public.delete_item(text, text)': ['authenticated', 'service_role'],
+    'private.publish_item(text, text)': ['authenticated'],
+    'public.publish_item(text, text)': ['authenticated', 'service_role'],
+    'private.add_suggested_task(text, text, text, jsonb)': ['authenticated'],
+    'public.add_suggested_task(text, text, text, jsonb)': ['authenticated', 'service_role'],
+    'private.dismiss_suggestion(text, text, text)': ['authenticated'],
+    'public.dismiss_suggestion(text, text, text)': ['authenticated', 'service_role'],
+    'private.agent_list_items()': ['anon'],
+    'public.agent_list_items()': ['anon', 'service_role'],
+    'private.agent_get_checkin(text)': ['anon'],
+    'public.agent_get_checkin(text)': ['anon', 'service_role'],
+    'private.agent_create_item(text, jsonb)': ['anon'],
+    'public.agent_create_task(text, text, text, jsonb, text)': ['anon', 'service_role'],
+    'public.agent_create_checkin(text, text, text, jsonb)': ['anon', 'service_role'],
+    'private.agent_update_item(text, jsonb)': ['anon'],
+    'public.agent_update_item(text, jsonb)': ['anon', 'service_role'],
+    'private.agent_delete_item(text)': ['anon'],
+    'public.agent_delete_item(text)': ['anon', 'service_role'],
+    'private.agent_draft(private.agent_keys, text)': [],
+    'private.item_links(text, uuid)': [],
+    'private.updates_expired(date)': [],
+    'private.real_date(text)': [],
+    'private.parse_item(text, text, jsonb)': [],
+    'private.item_json(private.timeline_items, bigint)': [],
+    'private.checkin_json(private.timeline_items, bigint)': [],
+    'private.step_key(jsonb)': [],
+    'private.suggestions_json(text)': [],
+    'private.visible_item(text, uuid)': [],
+    'private.item_uuid(text)': [],
+    'private.delete_old_checkin_updates()': [],
   };
   for (const [fn, allowed] of Object.entries(expected)) {
     for (const role of ['anon', 'authenticated', 'service_role', 'supabase_auth_admin']) {
@@ -247,12 +289,15 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
   // Nothing else is reachable through the API (functions in "public").
   const fns = await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1`);
   assert.deepEqual(fns.rows.map((x) => x.proname),
-    ['add_meeting', 'add_member', 'agent_create_meeting', 'agent_due', 'agent_get_availability', 'agent_get_course',
-     'agent_get_meeting', 'agent_get_responses', 'agent_open_scheduling', 'agent_put_course_notes', 'agent_put_section',
-     'agent_suggest_time', 'agent_update_meeting', 'agent_whoami', 'cancel_schedule', 'create_agent_key', 'create_meeting',
-     'get_answers', 'get_course', 'get_schedule', 'get_tallies', 'get_version', 'get_versions', 'hook_before_user_created',
-     'is_member', 'keepalive', 'pick_time', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_availability',
-     'save_part', 'set_published', 'skip_question', 'sync_course', 'sync_meetings', 'update_course', 'update_member']);
+    ['add_item', 'add_meeting', 'add_member', 'add_suggested_task', 'agent_create_checkin', 'agent_create_meeting',
+     'agent_create_task', 'agent_delete_item', 'agent_due', 'agent_get_availability', 'agent_get_checkin', 'agent_get_course',
+     'agent_get_meeting', 'agent_get_responses', 'agent_list_items', 'agent_open_scheduling', 'agent_put_course_notes',
+     'agent_put_section', 'agent_suggest_time', 'agent_update_item', 'agent_update_meeting', 'agent_whoami',
+     'cancel_schedule', 'create_agent_key', 'create_meeting', 'delete_item', 'dismiss_suggestion', 'get_answers',
+     'get_checkin', 'get_course', 'get_schedule', 'get_tallies', 'get_version', 'get_versions', 'hook_before_user_created',
+     'is_member', 'keepalive', 'pick_time', 'publish_item', 'remove_member', 'revoke_agent_key', 'save_answer',
+     'save_availability', 'save_checkin_update', 'save_part', 'set_published', 'skip_question', 'sync_course',
+     'sync_meetings', 'update_course', 'update_item', 'update_member']);
   const tables = await db.query(`select count(*)::int as n from pg_tables where schemaname = 'public'`);
   assert.equal(tables.rows[0].n, 0, 'no tables in the API schema');
 });
