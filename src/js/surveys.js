@@ -99,7 +99,7 @@ function resultsView(question, rows) {
 
 function formatTime(timestamp) {
   try {
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(timestamp));
+    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Zurich' }).format(new Date(timestamp));
   } catch {
     return '';
   }

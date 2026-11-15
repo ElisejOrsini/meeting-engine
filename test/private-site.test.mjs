@@ -186,3 +186,25 @@ test('preview: the example adds ten teammates’ answers and an AI summary that 
   assert.match(meeting.intro_html, /one late-submission rule/);
   assert.equal(meeting.saved.in.by, 'OpenClaw (example) (agent)');
 });
+
+test('date fields: day first, whatever the browser language', async () => {
+  const { isoToEuropean, europeanToIso, dateField, timeField } = await import('../src/js/datefield.js');
+  assert.equal(isoToEuropean('2026-11-17'), '17/11/2026');
+  assert.equal(isoToEuropean(''), '');
+  assert.equal(europeanToIso('17/11/2026'), '2026-11-17');
+  assert.equal(europeanToIso('1.2.26'), '2026-02-01');
+  assert.equal(europeanToIso('17-11-2026'), '2026-11-17');
+  assert.equal(europeanToIso('2026-11-17'), '2026-11-17');
+  assert.equal(europeanToIso('17112026'), '2026-11-17');
+  assert.equal(europeanToIso('171126'), '2026-11-17');
+  assert.equal(europeanToIso('31/02/2026'), '');
+  assert.equal(europeanToIso('11/17/2026'), ''); // month 17: not a date
+  assert.equal(europeanToIso('17/11'), '');
+  const field = String(dateField({ id: 'x', name: 'due', value: '2026-11-17', min: '2026-11-15' }));
+  assert.match(field, /id="x" type="text"[^>]*value="17\/11\/2026"/);
+  assert.match(field, /type="date" class="date-native" name="due" value="2026-11-17" min="2026-11-15"/);
+  const time = String(timeField({ id: 't', name: 'time', value: '14:00', step: 15 }));
+  assert.match(time, /<option value="14:00" selected>14:00<\/option>/);
+  assert.match(time, /<option value="23:45" >23:45<\/option>/);
+  assert.doesNotMatch(time, /PM|AM/);
+});

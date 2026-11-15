@@ -25,6 +25,7 @@ import {
   readItemFields, wireWhoPickers, wireItemActions, openCheckin, nameOf, plainText, announce,
 } from './items.js';
 import { zurichToDate } from './calendar.js';
+import { dateField, timeField } from './datefield.js';
 
 const DAY_MS = 864e5;
 const DETAIL_WEEKS = 3; // this week and the next two: day by day
@@ -265,19 +266,19 @@ function addSheet(site, today) {
           <div data-for="checkin" hidden>${itemFields(site, 'checkin', 'add-checkin', { due: addDays(monday, 4) })}</div>
           <div data-for="find">
             <div class="add-row">
-              <div class="field"><label for="add-from">First day</label><input id="add-from" name="from" type="date" class="text-input" value="${monday}" min="${today}"></div>
-              <div class="field"><label for="add-to">Last day</label><input id="add-to" name="to" type="date" class="text-input" value="${addDays(monday, 4)}" min="${today}"></div>
+              <div class="field"><label for="add-from">First day</label>${dateField({ id: 'add-from', name: 'from', label: 'the first day', value: monday, min: today })}</div>
+              <div class="field"><label for="add-to">Last day</label>${dateField({ id: 'add-to', name: 'to', label: 'the last day', value: addDays(monday, 4), min: today })}</div>
             </div>
             <div class="add-row">
-              <div class="field"><label for="add-start">Earliest start</label><input id="add-start" name="start" type="time" step="1800" class="text-input" value="09:00"></div>
-              <div class="field"><label for="add-end">Latest end</label><input id="add-end" name="end" type="time" step="1800" class="text-input" value="18:00"></div>
+              <div class="field"><label for="add-start">Earliest start</label>${timeField({ id: 'add-start', name: 'start', value: '09:00', step: 30 })}</div>
+              <div class="field"><label for="add-end">Latest end</label>${timeField({ id: 'add-end', name: 'end', value: '18:00', step: 30 })}</div>
             </div>
             <label class="option add-weekends"><input type="checkbox" name="weekends"> <span>Include Saturdays and Sundays</span></label>
           </div>
           <div data-for="fixed" hidden>
             <div class="add-row">
-              <div class="field"><label for="add-date">Date</label><input id="add-date" name="date" type="date" class="text-input" value="${monday}" min="${today}"></div>
-              <div class="field"><label for="add-time">Time</label><input id="add-time" name="time" type="time" step="900" class="text-input" value="14:00"></div>
+              <div class="field"><label for="add-date">Date</label>${dateField({ id: 'add-date', name: 'date', label: 'the date', value: monday, min: today })}</div>
+              <div class="field"><label for="add-time">Time</label>${timeField({ id: 'add-time', name: 'time', value: '14:00', step: 15 })}</div>
             </div>
             <div class="field"><label for="add-place">Place <span class="muted">(optional)</span></label><input id="add-place" name="place" class="text-input" maxlength="300" autocomplete="off" placeholder="e.g. HG E 33 and Zoom"></div>
           </div>
@@ -570,7 +571,7 @@ function wireAddForm(form, { site, client, reload, signal }) {
     const length = Number(f.duration.value); // not "length": form.elements.length is the number of fields
     let args;
     if (f.kind.value === 'find') {
-      if (!f.from.value || !f.to.value || f.to.value < f.from.value) return say('Check the days: the last day can’t be before the first.', f.to);
+      if (!f.from.value || !f.to.value || f.to.value < f.from.value) return say(!f.from.value || !f.to.value ? 'Write the days as DD/MM/YYYY.' : 'Check the days: the last day can’t be before the first.', f.from.value ? f.to : f.from);
       const days = daysBetweenDates(f.from.value, f.to.value, { weekends: f.weekends.checked });
       if (!days.length) return say('There are no weekdays between these days. Tick “Include Saturdays and Sundays”, or pick other days.', f.from);
       if (days.length > 14) return say(`That’s ${days.length} days; 14 at most.`, f.to);
@@ -581,7 +582,8 @@ function wireAddForm(form, { site, client, reload, signal }) {
         p_schedule: { days, from: f.start.value, to: f.end.value, slot_min: 30, duration_min: length },
       };
     } else {
-      if (!f.date.value || !f.time.value) return say('Give the date and the time.', f.date);
+      if (!f.date.value) return say('Write the date as DD/MM/YYYY.', f.date);
+      if (!f.time.value) return say('Give the time.', f.time);
       const place = f.place.value.trim();
       args = {
         p_course: site.course.id,

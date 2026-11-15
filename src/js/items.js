@@ -5,6 +5,7 @@
 
 import { html, raw, link } from './dom.js';
 import { formatDate } from './views.js';
+import { dateField } from './datefield.js';
 
 /** "Mia", "You", or the GitHub username, for a login. */
 export function nameOf(site, login) {
@@ -65,7 +66,7 @@ export function itemFields(site, kind, prefix, item = {}) {
     </div>
     <div class="field">
       <label for="${prefix}-due">${kind === 'checkin' ? 'Write by' : 'Due'}</label>
-      <input id="${prefix}-due" name="${prefix}-due" type="date" class="text-input" value="${item.due ?? ''}" min="${item.due && item.due < today ? item.due : today}">
+      ${dateField({ id: `${prefix}-due`, name: `${prefix}-due`, label: kind === 'checkin' ? 'the write-by date' : 'the due date', value: item.due ?? '', min: item.due && item.due < today ? item.due : today })}
     </div>
     ${whoPicker(site, prefix, item.people ?? [], item.everyone ?? true)}
     <div class="field">
@@ -81,7 +82,7 @@ export function readItemFields(form, kind, prefix) {
   const title = value('title');
   if (!title) return { error: 'Give it a title.', focus: `${prefix}-title` };
   const due = value('due');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return { error: 'Give the date.', focus: `${prefix}-due` };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return { error: 'Write the date as DD/MM/YYYY.', focus: `${prefix}-due` };
   const everyone = form.querySelector(`[name="${prefix}-everyone"]`)?.checked;
   const people = [...form.querySelectorAll(`[name="${prefix}-person"]:checked`)].map((c) => c.value);
   if (!everyone && !people.length) return { error: 'Choose who, or Everyone.', focus: `${prefix}-everyone` };

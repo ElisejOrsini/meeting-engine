@@ -962,6 +962,47 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 }
 .text-input:focus-visible { outline: 2px solid transparent; border-color: var(--accent-fill); box-shadow: 0 0 0 3px rgb(0 113 227 / 0.35); }
 .add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Date fields (datefield.js): DD/MM/YYYY text, a calendar button inside the
+   field on the right, and the browser's own date field hidden underneath
+   (it only opens the calendar). */
+.date-field { position: relative; display: block; }
+.date-field .date-text { padding-right: 48px; }
+.date-pick {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+.date-pick:hover { background: var(--hover); }
+/* A small calendar, drawn with borders (no images allowed). */
+.date-pick::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 14px;
+  transform: translate(-50%, -45%);
+  border: 1.5px solid var(--text-2);
+  border-top-width: 4px;
+  border-radius: 3px;
+}
+.date-native {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .tl-add .field { margin-bottom: 20px; }
 .add-weekends { margin: -8px 0 20px; border-radius: var(--radius-control); background: var(--surface-2); }
 .tl-add [hidden] { display: none; }
