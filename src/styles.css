@@ -807,7 +807,10 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 .chip-task, .chip-suggestion { --chip: var(--c-task); --chip-tint: var(--c-task-tint); border-radius: 8px; }
 .chip-suggestion { background: var(--surface); outline: 1.5px dashed var(--c-task); outline-offset: -1.5px; }
 .chip.is-past { --chip: var(--text-2); --chip-tint: var(--fill); }
-.tl-rail .chip { box-shadow: 0 0 0 4px var(--bg); }
+/* On the line, the chips' tints are laid over the page colour, so the line
+   doesn't show through them. */
+.tl-rail .chip { background: linear-gradient(var(--chip-tint), var(--chip-tint)), var(--bg); box-shadow: 0 0 0 4px var(--bg); }
+.tl-rail .chip-suggestion { background: var(--surface); }
 
 /* Months and week headers */
 .tl-month.tl-row {
@@ -832,7 +835,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 .tl-dayrow { min-height: 26px; }
 .tl-dayrow .tl-date { font-size: 0.75rem; color: var(--text-3); }
 .tl-dayrow.is-weekend .tl-date { opacity: 0.7; }
-.tl-daytick { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); opacity: 0.6; box-shadow: 0 0 0 3px var(--bg); }
+.tl-daytick { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--text-3) 60%, var(--bg)); box-shadow: 0 0 0 3px var(--bg); }
 
 /* Items: upcoming on white cards, past ones plain and grey */
 .tl-item {
@@ -886,7 +889,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   height: 14px;
   border-radius: 50%;
   background: var(--accent-fill);
-  box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--accent-tint);
+  box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--accent-tint), 0 0 0 7px var(--bg); /* last: solid under the tint */
 }
 .tl-today-line { display: flex; align-items: center; gap: 10px; margin-left: 12px; color: var(--accent); font-size: 0.875rem; font-weight: 600; }
 .tl-today-line::after { content: ""; flex: 1; height: 2px; border-radius: 1px; background: var(--accent-fill); opacity: 0.35; }

@@ -1,6 +1,6 @@
 # Settings of this team's private meeting site. Every option is explained in
 # the engine's docs:
-# https://github.com/ElisejOrsini/meeting-engine/blob/v0.9.4/docs/private-course.md
+# https://github.com/ElisejOrsini/meeting-engine/blob/v0.9.5/docs/private-course.md
 #
 # This repository only configures the website: the meetings, the team list
 # and everything else the team writes live in the database, and only signed-in
