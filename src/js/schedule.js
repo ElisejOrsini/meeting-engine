@@ -8,7 +8,7 @@
 //   slot and removes if you started on a marked one. Keyboard: arrow keys
 //   move, Space or Enter marks. Saves by itself.
 // - "Everyone": darker = more people free. Pointing at, tapping or focusing
-//   a slot shows who is free.
+//   a slot shows who is free. Darkest = all who have marked their times.
 // - From 860 px both grids sit side by side; narrower, a switch.
 
 import { html } from './dom.js';
@@ -133,7 +133,7 @@ function draw(box, meeting, first, { site, call, signal, onChange }) {
         <h3 class="tl-sheet-h" id="av-all-h">Everyone</h3>
         <p class="muted small av-count"></p>
         <div class="av-grid av-grid-all" role="group" aria-labelledby="av-all-h"></div>
-        <p class="av-legend" aria-hidden="true"><span>0</span><span class="av-legend-bar"></span><span>${data.members} free</span></p>
+        <p class="av-legend" aria-hidden="true"><span>0</span><span class="av-legend-bar"></span><span class="av-legend-max"></span></p>
         <p class="av-info" aria-live="polite">Point at a time (or tap it) to see who’s free.</p>
       </section>
     </div>
@@ -347,8 +347,12 @@ function draw(box, meeting, first, { site, call, signal, onChange }) {
   };
   function drawAll() {
     const everyone = people();
-    const total = Math.max(data.members, 1);
+    // Darkest = everyone who has marked their times (not the whole team), so
+    // the map shows contrast from the first few answers on.
+    const total = Math.max(everyone.length, 1);
     box.querySelector('.av-count').textContent = `${everyone.length} of ${data.members} have marked their times.`;
+    box.querySelector('.av-legend-max').textContent = everyone.length
+      ? `${everyone.length} free (all who answered)` : 'free';
     for (const cell of cells.all.flat()) {
       if (!cell) continue;
       const ms = cellMs(cell);
