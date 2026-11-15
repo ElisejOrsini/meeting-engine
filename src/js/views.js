@@ -116,25 +116,57 @@ function meetingRow(meeting, today, members = 0) {
     </li>`;
 }
 
+// A written check-in among the meetings (private courses). It opens on the
+// timeline, where it is answered.
+function checkinRow(item, today) {
+  const status = [];
+  if (!item.published) status.push(html`<span class="badge badge-draft">Draft</span>`);
+  if (item.due === today) status.push(html`<span class="badge badge-today">Today</span>`);
+  if (item.for_me && item.mine) status.push(html`<span class="status-ok">You wrote yours</span>`);
+  else if (item.published && item.for_me && item.due >= today) status.push(html`<span class="status-warn">Yours to write</span>`);
+  if (item.expected) status.push(html`<span>${item.written} of ${item.expected} written</span>`);
+  return html`
+    <li class="row-checkin">
+      <a class="row-link" href="#/timeline?open=item-${encodeURIComponent(item.id)}">
+        <span class="row-text">
+          <span class="row-title">${item.title}</span>
+          <span class="row-subtitle"><span class="row-kind">Written check-in</span> · write by ${formatDate(item.due)}</span>
+        </span>
+        ${status.length ? html`<span class="row-meta">${status}</span>` : ''}
+        <span class="chevron" aria-hidden="true"></span>
+      </a>
+    </li>`;
+}
+
 export function meetingsView(site, today = localToday()) {
   // Meetings without a time yet come last among the upcoming ones.
   // (still finding a time: by the grid's first day)
   const when = (m) => m.schedule?.days?.[0] || m.date || '9999';
-  const upcoming = site.meetings.filter((m) => m.schedule || !m.date || m.date >= today)
-    .sort((a, b) => when(a).localeCompare(when(b)));
-  const past = site.meetings.filter((m) => !m.schedule && m.date && m.date < today); // already newest first
+  const meetingRows = (list) => list.map((m) => ({ date: when(m), row: (members) => meetingRow(m, today, members) }));
+  // Written check-ins sit among the meetings, by their write-by date.
+  const checkins = (site.items ?? []).filter((i) => i.kind === 'checkin' && i.due);
+  const checkinRows = (list) => list.map((i) => ({ date: i.due, row: () => checkinRow(i, today) }));
+  const upcoming = [
+    ...meetingRows(site.meetings.filter((m) => m.schedule || !m.date || m.date >= today)),
+    ...checkinRows(checkins.filter((i) => i.due >= today)),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+  const past = [
+    ...meetingRows(site.meetings.filter((m) => !m.schedule && m.date && m.date < today)),
+    ...checkinRows(checkins.filter((i) => i.due < today)),
+  ].sort((a, b) => b.date.localeCompare(a.date)); // newest first
   const members = site.members?.length ?? 0;
-  const list = (items, empty) => (items.length
-    ? html`<ul class="list">${items.map((m) => meetingRow(m, today, members))}</ul>`
+  const list = (rows, empty) => (rows.length
+    ? html`<ul class="list">${rows.map((r) => r.row(members))}</ul>`
     : html`<p class="muted">${empty}</p>`);
+  const what = checkins.length ? '' : ' meetings';
   return {
     title: 'Meetings',
     body: html`
       <h1 tabindex="-1">${site.course.name}</h1>
       ${site.course.description_html ? html`<div class="prose lead">${raw(site.course.description_html)}</div>` : ''}
       ${site.course.links.length ? html`<p class="course-links">${site.course.links.map((l) => html`<a href="${l.url}" rel="noopener">${l.title}</a>`)}</p>` : ''}
-      <section class="block"><h2>Upcoming meetings</h2>${list(upcoming, 'No upcoming meetings yet.')}</section>
-      <section class="block"><h2>Past meetings</h2>${list(past, 'No past meetings yet.')}</section>
+      <section class="block"><h2>Upcoming${what}</h2>${list(upcoming, 'No upcoming meetings yet.')}</section>
+      <section class="block"><h2>Past${what}</h2>${list(past, 'No past meetings yet.')}</section>
       ${site.course.notes_html ? html`
         <details class="block course-notes">
           <summary><h2>Course notes and timeline</h2></summary>

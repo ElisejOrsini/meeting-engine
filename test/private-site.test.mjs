@@ -208,3 +208,29 @@ test('date fields: day first, whatever the browser language', async () => {
   assert.match(time, /<option value="23:45" >23:45<\/option>/);
   assert.doesNotMatch(time, /PM|AM/);
 });
+
+test('meetings list: written check-ins sit among the meetings by their write-by date', async () => {
+  const { meetingsView } = await import('../src/js/views.js');
+  const meeting = (id, date) => ({ id, title: id, date, time: null, questions: [], decisions: [], summary_html: '', schedule: null });
+  const checkin = (id, due, extra = {}) => ({ id, kind: 'checkin', title: id, due, published: true, for_me: true, mine: false, expected: 4, written: 1, ...extra });
+  const site = {
+    course: { name: 'C', links: [] }, members: [],
+    meetings: [meeting('m-dec', '2026-12-01'), meeting('m-nov', '2026-11-20'), meeting('m-old', '2026-11-01')],
+    items: [checkin('c-next', '2026-11-25'), checkin('c-old', '2026-11-05', { mine: true }), { id: 't', kind: 'task', title: 'task', due: '2026-11-21' }],
+  };
+  const body = String(meetingsView(site, '2026-11-15').body);
+  const [upcoming, past] = body.split('<h2>Past</h2>');
+  assert.match(upcoming, /<h2>Upcoming<\/h2>/);
+  const order = (text) => [...text.matchAll(/class="row-title">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(order(upcoming), ['m-nov', 'c-next', 'm-dec']);
+  assert.deepEqual(order(past), ['c-old', 'm-old']);
+  assert.match(upcoming, /href="#\/timeline\?open=item-c-next"/);
+  assert.match(upcoming, /Yours to write/);
+  assert.match(past, /You wrote yours/);
+  assert.doesNotMatch(body, />task</); // tasks stay on the timeline
+  const draft = String(meetingsView({ ...site, items: [checkin('c-draft', '2026-11-25', { published: false })] }, '2026-11-15').body);
+  assert.match(draft, /Draft/);
+  assert.doesNotMatch(draft, /Yours to write/);
+  // Without check-ins the headings stay as they were.
+  assert.match(String(meetingsView({ ...site, items: [] }, '2026-11-15').body), /<h2>Upcoming meetings<\/h2>/);
+});
