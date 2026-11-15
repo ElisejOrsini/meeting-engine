@@ -121,8 +121,10 @@ button on the site would need a paid API key and a server function, so it's
 left for later, if ever.
 
 **Vote counts and skipping** (decided 14 Nov): with "after_answering", you
-see a question's counts once you've answered **or skipped** it; everyone sees
-them from 30 minutes before the meeting. The survey sheet has a **Skip**
+see a question's counts once you've answered **or skipped** it, or once it has
+an AI summary (decided 15 Nov: the summary already gives the numbers; the
+In-meeting tab shows them as a small chart under it); everyone sees them from
+30 minutes before the meeting. The survey sheet has a **Skip**
 button right next to "Save answer", so not answering takes the same one
 click. A skip isn't a vote.
 
@@ -148,10 +150,15 @@ the answers are deleted (30 days after the meeting).
    `supabase/migrations/20261114120000_in_meeting.sql`, also adds
    `agent_get_responses` and `agent_due`)*
 3. **v0.7.0 Timeline with meetings only** (part A, no new data): replaces the
-   Decisions tab. *(built 14 Nov, not released yet: `src/js/timeline.js`,
+   Decisions tab. *(released 14 Nov: `src/js/timeline.js`,
    `#/timeline`, old `#/decisions` links lead there; new optional
    `semester: { start, weeks }` in course.yml for the "Week 10" labels)*
 4. **v0.8.0 Scheduling** (availability windows and grid, DB part 5).
+   *(built 14 Nov, not released yet: `supabase/migrations/20261114180000_scheduling.sql`,
+   `src/js/schedule.js`, `src/js/calendar.js`. Decided 14 Nov: the agent sees
+   names in availability; meetings added on the site are visible at once;
+   after "Pick", organizers get "Send Outlook invite" (a prefilled Outlook
+   event, sent from their own mailbox) and everyone "Add to calendar".)*
 5. **v0.9.0 Tasks and check-ins.**
 
 Each release: tests, preview on `private-local`, your OK, then tag and push.

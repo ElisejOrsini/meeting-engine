@@ -22,6 +22,9 @@
   --orange: #a54a00;
   --orange-tint: rgb(165 74 0 / 0.12);
   --highlight: rgb(0 113 227 / 0.08);
+  --text-2-on-tint: #5c5c61; /* secondary text on --accent-tint (AA) */
+  --accent-on-tint: #005bb8; /* accent text on --accent-tint (AA) */
+  --chart-other: color-mix(in srgb, var(--accent-fill) 45%, var(--surface-2)); /* bars that aren't the leading option */
   --header: rgb(255 255 255 / 0.72);
   --segment: #ffffff;
   --segment-shadow: 0 3px 8px rgb(0 0 0 / 0.12), 0 3px 1px rgb(0 0 0 / 0.04);
@@ -53,6 +56,9 @@
     --orange: #ff9f0a;
     --orange-tint: rgb(255 159 10 / 0.18);
     --highlight: rgb(10 132 255 / 0.14);
+    --text-2-on-tint: var(--text-2);
+    --accent-on-tint: var(--accent);
+    --chart-other: color-mix(in srgb, var(--accent-fill) 65%, var(--surface-2));
     --header: rgb(28 28 30 / 0.72);
     --segment: #636366;
     --segment-shadow: 0 3px 8px rgb(0 0 0 / 0.3);
@@ -631,7 +637,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 
 /* ----- In-meeting: what to decide ----- */
 
-.in-intro { margin-bottom: 8px; }
+.in-intro { margin: 32px 0 8px; }
 .summary-countdown { margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
 .countdown-label { font-weight: 600; }
 .countdown-value { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
@@ -672,11 +678,35 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 .key-points li + li { margin-top: 2px; }
 .decide-tallies .response-field { margin: 6px 0 0; }
 .decide-tallies .response-label { margin: 8px 0 4px; font-size: 0.8125rem; }
-.decide-votes > summary { cursor: pointer; width: fit-content; font-size: 0.9375rem; color: var(--text-2); list-style: none; }
-.decide-votes > summary::-webkit-details-marker { display: none; }
-.decide-votes > summary::after { content: " ›"; }
-.decide-votes[open] > summary::after { content: " ⌄"; }
-.decide-votes > summary:hover { color: var(--text); }
+/* The results chart under a question's AI summary (In-meeting tab) */
+.decide-tallies { margin: 14px 0 4px; }
+.decide-chart { margin: 0 0 14px; padding: 14px 16px 12px; border-radius: var(--radius-control); background: var(--surface-2); }
+.decide-chart figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin-bottom: 10px; }
+.decide-chart-title { font-size: 0.875rem; font-weight: 600; }
+.decide-chart-meta { font-size: 0.8125rem; color: var(--text-2); }
+.chart-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.chart-bars li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr) 4.75rem;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+}
+.chart-label { color: var(--text-2); overflow-wrap: anywhere; }
+.chart-bars li.is-top .chart-label { color: var(--text); font-weight: 600; }
+.chart-track { height: 10px; border-radius: 0 4px 4px 0; background: var(--fill); overflow: hidden; }
+.chart-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0; /* flat at the baseline, rounded at the value */
+  background: var(--chart-other);
+  transition: width 0.4s ease-out;
+}
+.chart-bars li.is-top .chart-bar { background: var(--accent-fill); }
+.chart-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.chart-share { font-weight: 400; color: var(--text-2); }
 .decide-more > summary { cursor: pointer; color: var(--accent); font-size: 0.9375rem; list-style: none; }
 .decide-more > summary::-webkit-details-marker { display: none; }
 .decide-more > summary::after { content: " ›"; }
@@ -840,6 +870,182 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 .tl-decisions .prose > :last-child { margin-bottom: 0; }
 .tl-sheet-actions { margin: 24px 0 0; }
 
+/* Planned meetings (still finding a time): dashed clock chip, shaded band */
+.chip-window { background: var(--surface); outline: 1.5px dashed var(--c-meeting); outline-offset: -1.5px; }
+.chip-window.is-past { outline-color: var(--text-3); }
+.tl-span { position: relative; margin: 6px 0; }
+.tl-span::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0 -2px calc(var(--date-col) + 1px);
+  border-radius: 16px;
+  background: var(--accent-tint);
+  pointer-events: none;
+}
+.tl-span > .tl-row { z-index: 1; }
+.tl-span .tl-row::before { left: calc(var(--line-x) - 2px); width: 6px; background: var(--accent-fill); opacity: 0.4; }
+.tl-span .tl-dayrow.is-offered .tl-date { color: var(--accent); }
+.tl-span .tl-dayrow.is-offered .tl-daytick { background: var(--accent-fill); box-shadow: none; opacity: 1; }
+.tl-span-end {
+  position: absolute;
+  z-index: 1;
+  bottom: 8px;
+  left: 0;
+  width: var(--date-col);
+  padding-right: 12px;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+.tl-item.kind-window .tl-card, .tl-item.kind-window:hover .tl-card { background: transparent; }
+.tl-dayrow.is-continued { min-height: 34px; }
+.tl-continued { padding-left: 12px; font-size: 0.8125rem; color: var(--text-2-on-tint); }
+.tl-item.kind-window .tl-sub, .tl-item.kind-window.is-done .tl-kind, .tl-span-end { color: var(--text-2-on-tint); }
+.tl-item.kind-window.is-upcoming .tl-kind, .tl-span .tl-dayrow.is-offered .tl-date { color: var(--accent-on-tint); }
+.tl-cta {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 980px;
+  background: var(--accent-fill);
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.tl-item.is-done .tl-cta { display: none; }
+
+/* Timeline header and "+ Add" (organizers) */
+.tl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tl-head h1 { margin-bottom: 0; }
+.text-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+}
+.text-input:focus-visible { outline: 2px solid transparent; border-color: var(--accent-fill); box-shadow: 0 0 0 3px rgb(0 113 227 / 0.35); }
+.add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tl-add .field { margin-bottom: 20px; }
+.add-weekends { margin: -8px 0 20px; border-radius: var(--radius-control); background: var(--surface-2); }
+.tl-add [hidden] { display: none; }
+
+/* The availability sheet: wider than the survey sheets */
+.sheet.sheet-wide { width: min(58rem, calc(100vw - 32px)); }
+@media (max-width: 640px) { .sheet.sheet-wide { width: 100%; } }
+.av { --cell: color-mix(in srgb, var(--text) 9%, var(--surface)); }
+.sheet-text { margin: 4px 0 0; }
+.av-switch { margin: 16px 0 4px; }
+.av-panes { display: grid; gap: 28px; }
+.av-panes[data-show="mine"] .av-pane-all, .av-panes[data-show="all"] .av-pane-mine { display: none; }
+@media (max-width: 859px) { .av-pane > .tl-sheet-h { display: none; } .av-hint, .av-count { margin-top: 14px; } }
+@media (min-width: 860px) {
+  .av-switch { display: none; }
+  .av-panes { grid-template-columns: 1fr 1fr; }
+  .av-panes .av-pane { display: block !important; }
+  .av-hint, .av-count { min-height: 2.9em; } /* both grids start at the same height */
+}
+.av-pane .tl-sheet-h { margin-top: 16px; margin-bottom: 2px; }
+.av-hint, .av-count { margin: 0 0 10px; }
+.av-grid {
+  display: grid;
+  grid-template-rows: 2.4rem;
+  grid-auto-rows: 15px;
+  column-gap: 3px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.av-grid-mine { touch-action: none; cursor: crosshair; }
+.av-day { align-self: end; padding-bottom: 6px; text-align: center; font-size: 0.75rem; line-height: 1.2; color: var(--text-2); }
+.av-day b { display: block; color: var(--text); font-weight: 600; }
+.av-day .av-short { display: none; }
+.av-grid.is-many .av-day .av-long { display: none; }
+.av-grid.is-many .av-day .av-short { display: inline; }
+.av-grid.is-many .av-day b.av-short { display: block; }
+@media (max-width: 640px) {
+  .av-grid.is-some .av-day .av-long { display: none; }
+  .av-grid.is-some .av-day .av-short { display: inline; }
+  .av-grid.is-some .av-day b.av-short { display: block; }
+}
+.av-day { overflow: hidden; }
+.av-time { margin-top: -0.45em; padding-right: 8px; text-align: right; font-size: 0.6875rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.av-cell {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--separator);
+  border-radius: 0;
+  background: var(--cell);
+  color: inherit;
+  font: inherit;
+  transition: background-color 0.1s;
+}
+.av-cell.is-half { border-top-style: dotted; }
+.av-cell:focus-visible {
+  outline: 2px solid var(--text); /* contrasts with grey and with marked (blue) slots */
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 3px var(--surface);
+  position: relative;
+  z-index: 1;
+}
+.av-grid-mine .av-cell.is-past { background: repeating-linear-gradient(135deg, var(--cell) 0 4px, transparent 4px 8px); cursor: not-allowed; }
+.av-grid-mine .av-cell:hover:not(.is-past) { background: color-mix(in srgb, var(--cell), var(--accent-fill) 20%); }
+.av-grid-mine .av-cell.is-on { background: var(--accent-fill); border-top-color: rgb(255 255 255 / 0.25); }
+.av-grid-all .av-cell { --p: 0%; background: color-mix(in srgb, var(--accent-fill) var(--p), var(--cell)); cursor: pointer; }
+.av-grid-all .av-cell.is-selected, .av-grid-all .av-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; position: relative; z-index: 1; }
+.av-legend { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 0.75rem; color: var(--text-2); }
+.av-legend-bar { flex: 0 1 8rem; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--cell), var(--accent-fill)); }
+.av-info { margin: 10px 0 0; min-height: 4.5em; font-size: 0.875rem; line-height: 1.45; }
+.av-status { display: block; min-height: 1.5em; margin-top: 8px; }
+.av-best { margin-top: 8px; }
+.av-best .list { background: var(--surface-2); }
+.av-best-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.av-best-row .row-subtitle { font-size: 0.8125rem; }
+.av-suggestion { margin: 16px 0 0; padding: 14px 16px; border-radius: var(--radius-control); background: var(--accent-tint); }
+.av-suggestion .consensus-label, .av-suggestion .muted { color: var(--text-2-on-tint); }
+.av-suggestion p { margin: 0 0 6px; }
+.av-confirm { margin-top: 16px; }
+.av-confirm p { margin: 0 0 10px; }
+.av-confirm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.av-organizer { margin: 20px 0 0; }
+
+/* A meeting still finding a time: an "Add your availability" button inside
+   its row in the meetings list (laid over the row's link, under its date
+   line), and a notice on its page. Both lead to its grid on the timeline. */
+.list > li.has-action > .row-link { padding-bottom: 60px; }
+.row-action {
+  position: absolute;
+  left: 20px;
+  right: 48px;
+  bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  pointer-events: none; /* clicks between the button and the count reach the row */
+}
+.row-action > * { pointer-events: auto; }
+.row-action-count { font-size: 0.8125rem; color: var(--text-2); pointer-events: none; }
+.notice-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 20px;
+  background: var(--accent-tint);
+}
+.notice-schedule p { flex: 1 1 260px; margin: 0; }
+
+/* Calendar actions on a meeting page */
+.calendar-actions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 6px 0 0; }
+
 /* ----- phones ----- */
 
 @media (max-width: 520px) {
@@ -847,6 +1053,8 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   .decide-item { padding: 16px 18px; }
   .decide-body { margin-left: 0; }
   .tally li { grid-template-columns: 1fr 2rem; }
+  .chart-bars li { grid-template-columns: minmax(0, 1fr) 4.75rem; row-gap: 4px; }
+  .chart-track { grid-column: 1 / -1; grid-row: 2; }
   .tally-bar { grid-column: 1 / -1; grid-row: 2; }
   .survey-others-note { display: block; margin: 8px 0 0; }
   .tabs { max-width: none; }
@@ -856,6 +1064,7 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
   .row-meta { grid-column: 1; grid-row: 2; justify-content: flex-start; max-width: none; margin-top: 4px; text-align: left; }
   .chevron { grid-column: 2; grid-row: 1 / span 2; }
   .tl { --date-col: 4.5rem; }
+  .add-row { grid-template-columns: 1fr; gap: 0; }
 }
 
 /* ----- accessibility settings ----- */
@@ -900,8 +1109,17 @@ html:has(dialog.sheet[open]) { overflow: hidden; }
 @media (forced-colors: active) {
   .button, .tabs a[aria-current="page"], .badge { border: 1px solid ButtonText; }
   .tally-bar > span { background: Highlight; }
+  .chart-track { forced-color-adjust: none; background: Canvas; border: 1px solid CanvasText; }
+  .chart-bar { forced-color-adjust: none; background: GrayText; }
+  .chart-bars li.is-top .chart-bar { background: Highlight; }
   .tl-row::before, .tl-wtick, .tl-daytick, .tl-today-dot, .tl-today-line::after { forced-color-adjust: none; background: CanvasText; }
   .tl-card { border: 1px solid CanvasText; }
+  .av-cell { border: 1px solid CanvasText; }
+  .av-grid-mine .av-cell.is-on { forced-color-adjust: none; background: Highlight; }
+  .av-grid-mine .av-cell.is-past { border-color: GrayText; border-style: dashed; }
+  .av-grid-all .av-cell { forced-color-adjust: none; background: color-mix(in srgb, Highlight var(--p), Canvas); }
+  .av-legend-bar { forced-color-adjust: none; background: linear-gradient(to right, Canvas, Highlight); border: 1px solid CanvasText; }
+  .av-cell:focus-visible { outline-color: Highlight; }
 }
 
 /* ---------- private courses: drafts, notes, next steps, Team page ---------- */

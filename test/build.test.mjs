@@ -384,3 +384,118 @@ test('timeline: one line with week headers, today in the middle, quiet empty wee
   assert.match(body, /No time set yet: <a href="#\/m\/someday">/);
   assert.doesNotMatch(body, /style=/, 'no inline styles (the security policy forbids them)');
 });
+
+test('calendar: the .ics file and the Outlook invite carry the meeting in UTC', async () => {
+  const { icsFor, outlookInviteUrl, zurichToDate, meetingTimes } = await import('../src/js/calendar.js');
+  assert.equal(zurichToDate('2026-11-24', '14:00').toISOString(), '2026-11-24T13:00:00.000Z', 'winter: UTC+1');
+  assert.equal(zurichToDate('2026-06-02', '14:00').toISOString(), '2026-06-02T12:00:00.000Z', 'summer: UTC+2');
+  assert.equal(zurichToDate('2026-10-25', '02:30').toISOString().slice(0, 13), '2026-10-25T01', 'the clock-change night');
+  const meeting = { id: 'late', title: 'Late submissions; rules, again', date: '2026-11-24', time: '14:00', duration: 90,
+    location: 'HG E 33, and Zoom' };
+  assert.equal(meetingTimes(meeting).end.toISOString(), '2026-11-24T14:30:00.000Z');
+  assert.equal(meetingTimes({ ...meeting, starts_at: '2026-11-24T15:00:00Z' }).start.toISOString(), '2026-11-24T15:00:00.000Z',
+    'private courses: starts_at wins');
+  assert.equal(meetingTimes({ id: 'x', title: 'X', date: '' }), null);
+  const ics = icsFor(meeting, { url: 'https://example.org/#/m/late', courseId: 'aip', now: new Date('2026-11-14T10:00:00Z') });
+  assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(ics, /\r\nDTSTART:20261124T130000Z\r\nDTEND:20261124T143000Z\r\n/);
+  assert.ok(ics.includes('\r\nSUMMARY:Late submissions\\; rules\\, again\r\n'), ics);
+  assert.match(ics, /\r\nLOCATION:HG E 33\\, and Zoom\r\n/);
+  assert.match(ics, /\r\nUID:aip-late@meeting-engine\r\n/);
+  for (const line of ics.split('\r\n')) assert.ok(new TextEncoder().encode(line).length <= 75, `folded: ${line}`);
+  const long = icsFor({ ...meeting, title: 'Ü'.repeat(80) });
+  assert.ok(long.includes('\r\n '), 'long lines are folded');
+  const url = new URL(outlookInviteUrl(meeting, { url: 'https://example.org/#/m/late' }));
+  assert.equal(url.origin, 'https://outlook.office.com');
+  assert.equal(url.searchParams.get('startdt'), '2026-11-24T13:00:00Z');
+  assert.equal(url.searchParams.get('enddt'), '2026-11-24T14:30:00Z');
+  assert.equal(url.searchParams.get('subject'), meeting.title);
+  assert.match(url.searchParams.get('body'), /https:\/\/example\.org\/#\/m\/late/);
+});
+
+test('timeline: a meeting still finding a time sits on its first day with its days shaded', async () => {
+  const { timelineView, daysBetweenDates, daysLabel } = await import('../src/js/timeline.js');
+  const { layoutGrid, spanText } = await import('../src/js/schedule.js');
+  assert.deepEqual(daysBetweenDates('2026-11-20', '2026-11-24'), ['2026-11-20', '2026-11-23', '2026-11-24'], 'weekdays only');
+  assert.equal(daysBetweenDates('2026-11-20', '2026-11-24', { weekends: true }).length, 5);
+  assert.equal(daysLabel('2026-11-23', '2026-11-27'), 'Mon 23 – Fri 27 Nov');
+
+  const base = { questions: [], decisions: [], summary_html: '' };
+  const site = {
+    private: true,
+    course: { id: 'c', name: 'T', semester: { start: '2026-09-14', weeks: 14 } },
+    me: { login: 'alice', organizer: true },
+    members: [{ login: 'alice' }, { login: 'bob' }, { login: 'carol' }],
+    meetings: [
+      { ...base, id: 'prep', title: 'Exam prep', date: '', schedule: {
+        days: ['2026-11-23', '2026-11-24', '2026-11-26'], from: '09:00', to: '18:00', slot_min: 30, duration_min: 60,
+        filled_in: 2, mine: false } },
+      { ...base, id: 'far', title: 'Far away', date: '', schedule: {
+        days: ['2027-01-11', '2027-01-12'], from: '09:00', to: '18:00', slot_min: 30, duration_min: 60, filled_in: 0, mine: true } },
+    ],
+  };
+  const body = String(timelineView(site, { today: '2026-11-14' }).body);
+  assert.match(body, /data-open="prep"[\s\S]*?Planned meeting[\s\S]*?Mon 23 – Thu 26 Nov · 2 of 3 answered[\s\S]*?Add your times/);
+  assert.match(body, /<div class="tl-span">[\s\S]*?data-open="prep"[\s\S]*?Tue 24[\s\S]*?Wed 25[\s\S]*?Thu 26[\s\S]*?<\/div>\s*<div class="tl-dayrow[^"]*"[^>]*>\s*<span class="tl-date">Fri 27/,
+    'the band covers Mon 23 – Thu 26, then ends');
+  assert.match(body, /tl-dayrow[^"]*is-offered[^>]*>\s*<span class="tl-date">Tue 24/, 'offered days are marked');
+  assert.doesNotMatch(body, /tl-dayrow[^"]*is-offered[^>]*>\s*<span class="tl-date">Wed 25/, 'Wednesday isn’t offered');
+  assert.match(body, /class="tl-span"><span class="tl-span-end">until Tue 12<\/span>[\s\S]*?Change your times/, 'far away: just its row');
+  assert.match(body, /January 2027/);
+  assert.match(body, /data-sheet="prep" data-schedule="prep"/);
+  assert.match(body, /data-open="__add"/, 'organizers see + Add');
+  assert.doesNotMatch(body, /No time set yet/, 'planned meetings aren’t listed as without a time');
+  assert.doesNotMatch(String(timelineView({ ...site, me: { login: 'bob', organizer: false } }, { today: '2026-11-14' }).body), /data-open="__add"/);
+  assert.doesNotMatch(body, /style=/, 'no inline styles');
+
+  // The grid: days across, times down, in Zurich time (also across a clock change).
+  const grid = layoutGrid(['2026-10-24T07:00:00Z', '2026-10-24T07:30:00Z', '2026-10-26T08:00:00Z', '2026-10-26T08:30:00Z']);
+  assert.deepEqual(grid.days, ['2026-10-24', '2026-10-26']);
+  assert.deepEqual(grid.times, ['09:00', '09:30']);
+  assert.equal(grid.at(1, 0), Date.parse('2026-10-26T08:00:00Z'), '09:00 in winter time is 08:00 UTC');
+  assert.equal(spanText(Date.parse('2026-11-24T13:00:00Z'), Date.parse('2026-11-24T14:00:00Z')), 'Tue 24 Nov, 14:00–15:00');
+});
+
+test('timeline: review fixes (length field, month headings outside the band)', async () => {
+  const { timelineView } = await import('../src/js/timeline.js');
+  const base = { questions: [], decisions: [], summary_html: '' };
+  const site = {
+    private: true,
+    course: { id: 'c', name: 'T' },
+    me: { login: 'alice', organizer: true },
+    members: [{ login: 'alice' }],
+    meetings: [{ ...base, id: 'cross', title: 'Across months', date: '', schedule: {
+      days: ['2026-11-30', '2026-12-01', '2026-12-02'], from: '09:00', to: '18:00', slot_min: 30, duration_min: 60, filled_in: 0, mine: false } }],
+  };
+  const body = String(timelineView(site, { today: '2026-11-20' }).body);
+  // form.elements.length is the number of fields, so the select must not be called "length".
+  assert.match(body, /<select id="add-length" name="duration"/);
+  assert.doesNotMatch(body, /name="length"/);
+  // The band is closed right before the December heading and opened again after it.
+  const at = body.indexOf('>December</h2>');
+  assert.match(body.slice(0, at), /<div class="tl-span">[\s\S]*<\/div><h2 class="tl-month[^>]*$/);
+  assert.match(body.slice(at), /^>December<\/h2><div class="tl-span">/);
+
+  // A planned meeting running past the day-by-day weeks continues in a short row.
+  const later = String(timelineView({ ...site, meetings: [{ ...site.meetings[0], schedule: {
+    ...site.meetings[0].schedule, days: ['2026-11-26', '2026-12-04'] } }] }, { today: '2026-11-14' }).body);
+  assert.match(later, /30 Nov – 6 Dec[\s\S]*?is-continued[\s\S]*?until Fri 4[\s\S]*?Across months: still finding a time/);
+});
+
+test('views: a meeting still finding a time asks for your availability and links to its grid', async () => {
+  const { meetingsView, meetingView } = await import('../src/js/views.js');
+  const meeting = {
+    id: 'prep', title: 'Exam prep', date: '2026-12-31', questions: [], decisions: [], summary_html: '', agenda: [],
+    schedule: { days: ['2026-11-23', '2026-11-27'], filled_in: 3, mine: false },
+  };
+  const site = { course: { name: 'T', links: [] }, members: [{}, {}, {}, {}, {}], meetings: [meeting] };
+  const list = String(meetingsView(site, '2026-11-15').body);
+  assert.match(list, /Time not set yet · finding a time, Mon 23 – Fri 27 Nov/, 'not its placeholder date');
+  assert.match(list, /<li class="has-action">\s*<a class="row-link" href="#\/m\/prep">[\s\S]*?<\/a>\s*<span class="row-action">\s*<a class="button button-small" href="#\/timeline\?open=prep">Add your availability[\s\S]*?3 of 5 answered[\s\S]*?<\/li>/,
+    'the button sits inside the meeting’s own row');
+  assert.ok(list.indexOf('Upcoming meetings') < list.indexOf('Exam prep') && list.indexOf('Exam prep') < list.indexOf('Past meetings'));
+  const page = String(meetingView(meeting, 'pre', '2026-11-15', { members: 5 }).body);
+  assert.match(page, /finding a time for this meeting[\s\S]*?Mon 23 – Fri 27 Nov\. 3 of 5 have answered[\s\S]*?href="#\/timeline\?open=prep">Add your availability/);
+  const mine = String(meetingsView({ ...site, meetings: [{ ...meeting, schedule: { ...meeting.schedule, mine: true } }] }, '2026-11-15').body);
+  assert.match(mine, /Change your availability/);
+});

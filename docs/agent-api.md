@@ -1,12 +1,12 @@
 # Agent API (draft v0)
 
-**Status: version 0, partly built (v0.6.0, 2026-11-14).** Part of the
+**Status: version 0, partly built (v0.8.0, 2026-11-14).** Part of the
 [architecture proposal](architecture.md). Built and tested: `agent_whoami`,
 `agent_get_course`, `agent_get_meeting`, `agent_create_meeting`,
 `agent_update_meeting`, `agent_put_section`, `agent_put_course_notes`,
-`agent_get_responses` and `agent_due` (database part 4). Still to come:
+`agent_get_responses` and `agent_due` (database part 4), and
 `agent_open_scheduling`, `agent_get_availability` and `agent_suggest_time`
-(scheduling, v0.8.0), then tasks and check-ins (v0.9.0). Names and shapes may
+(database part 5). Still to come: tasks and check-ins (v0.9.0). Names and shapes may
 still change until then; after that, changes get a new version number.
 
 **Rule for every new feature:** whatever a person can see or do on the site,
@@ -42,12 +42,12 @@ content-type: application/json
 
 A key has one of two permission levels:
 
-- `read`: every `get_…` call.
+- `read`: every `get_…` call, and `agent_due`.
 - `write`: additionally `create_meeting`, `update_meeting`, `put_section`,
-  `put_course_notes`, `open_scheduling`, `set_time`.
+  `put_course_notes`, `open_scheduling`, `suggest_time`.
 
-No key can change the team list or keys, publish a draft meeting, delete
-anything, or see who gave which survey answer.
+No key can change the team list or keys, publish a draft meeting, pick a
+meeting's time, delete anything, or see who gave which survey answer.
 
 ### Errors
 
@@ -182,12 +182,13 @@ scheduling state and the links to put in emails.
   "post": { "version": 0, "content": null },
   "links": { "pre": "https://<site>/#/m/late-submissions/pre",
              "in": "https://<site>/#/m/late-submissions/during",
-             "post": "https://<site>/#/m/late-submissions/post" }
+             "post": "https://<site>/#/m/late-submissions/post",
+             "schedule": "https://<site>/#/timeline?open=late-submissions" }
 }
 ```
 
-Milestone 7 adds `scheduling` (`{ "open": true, "deadline": "…" }`) and
-`links.schedule`.
+`links.schedule` opens the meeting on the site's timeline: its "find a time"
+grid while it is looking for a time, otherwise its short overview.
 
 ### `agent_put_section` (write)
 
@@ -286,51 +287,96 @@ Kinds so far:
   `disagreement_md`, on the item of each question in `missing`. Until it's
   written, the site shows a live countdown in its place.
 
-Later releases add kinds for scheduling and check-ins.
+- **`schedule`**: a meeting that is finding a time (open grid), until a time
+  is picked or its last day has passed. Fields: `meeting`, `title`,
+  `first_day`, `last_day`, `members`, `filled_in`, `not_filled_in` (GitHub
+  usernames, for a reminder), `suggestion`, `due_at` (two days before the
+  first day, 00:00), `links`. `state`:
+  - `"draft"`: the meeting isn't published, so nobody can fill in the grid;
+    ask an organizer to publish it.
+  - `"waiting"`: people are still filling it in. A reminder to
+    `not_filled_in` can help.
+  - `"due"`: everyone has filled it in, or `due_at` has passed: call
+    `agent_get_availability` and `agent_suggest_time` with the best time.
+  - `"suggested"`: waiting for an organizer to pick.
 
-### `agent_open_scheduling` (write) — v0.8.0, not built yet
+Check-ins and tasks come in v0.9.0.
 
-Opens the availability grid. The time zone is the course's.
+### `agent_open_scheduling` (write)
+
+Opens a "find a time" grid for a meeting (a draft too; the team sees it once
+an organizer publishes the meeting), or changes an open one. People's times
+are kept for the slots that still exist. If the meeting already has a time,
+this opens the grid again (rescheduling). Times are in the course's time zone
+(Europe/Zurich).
 
 ```json
 { "meeting": "late-submissions",
   "days": ["2026-11-23", "2026-11-24", "2026-11-26"],
-  "from": "08:00", "to": "20:00", "slot_min": 30,
-  "deadline": "2026-11-18T12:00:00+01:00" }
+  "from_time": "09:00", "to_time": "18:00", "slot_min": 30, "duration_min": 60 }
 ```
 
-Changing the grid later keeps what people filled in for slots that still exist.
+- `days`: 1 to 14 dates, today or later, all within 4 weeks.
+- `from_time` / `to_time` (default 09:00 / 18:00) and `slot_min` (15, 30 or 60,
+  default 30): the hours offered each day, on the slot grid.
+- `duration_min`: the meeting's length (default: the meeting's
+  `duration_min`, else 60); a multiple of `slot_min`.
 
-### `agent_get_availability` (read) — v0.8.0, not built yet
+Returns the grid (`days`, `from`, `to`, `slot_min`, `duration_min`,
+`filled_in`), `open`, `published` and `links` (`links.schedule` opens the grid
+on the site; put it in the invitation email).
+
+### `agent_get_availability` (read)
+
+Who is free when, with GitHub usernames (the team sees the same, with names),
+and the best times.
+
+```json
+{ "meeting": "late-submissions" }
+```
 
 ```json
 {
+  "meeting": "late-submissions", "open": true,
+  "days": ["2026-11-23", "2026-11-24"], "from": "09:00", "to": "18:00",
+  "slot_min": 30, "duration_min": 60, "time_zone": "Europe/Zurich",
+  "grid": ["2026-11-23T09:00:00+01:00", "…"],
   "members": 11, "filled_in": 8,
-  "not_filled_in": ["someone", "someone-else", "a-third"],
+  "not_filled_in": ["a-login", "another-login", "a-third"],
+  "people": [ { "login": "ElisejOrsini", "slots": ["2026-11-24T16:00:00+01:00", "…"] } ],
   "slots": [ { "start": "2026-11-24T16:00:00+01:00", "available": ["ElisejOrsini", "…"] } ],
   "best": [
     { "start": "2026-11-24T16:00:00+01:00", "end": "2026-11-24T17:00:00+01:00",
-      "available": 8, "missing": ["a-login"] }
-  ]
+      "free": 8, "available": ["…"], "missing": ["a-login"] }
+  ],
+  "suggestion": null,
+  "links": { "schedule": "…" }
 }
 ```
 
-`best` lists the start times where the most people are free for the whole
-meeting duration, best first (at most 5).
+- `slots` lists only slots where at least one person is free.
+- `best`: up to 5 start times still ahead where the whole meeting fits, most
+  people free first, then earliest; none closer to another than the meeting
+  plus two slots. `missing` = filled in, but not free then.
 
-### `agent_suggest_time` (write) — v0.8.0, not built yet
+### `agent_suggest_time` (write)
 
-Decided 2026-11-14: the agent only **suggests** a time; an organizer confirms
-it on the site ("Pick"), which sets the time and closes the grid. The shape
-below was the earlier `agent_set_time` draft and will change accordingly.
+The agent only **suggests** a time (decided 14 Nov 2026). The site shows the
+suggestion at the top of the grid with "Pick" for organizers; picking sets the
+meeting's time and closes the grid. A new suggestion replaces the old one.
 
 ```json
 { "meeting": "late-submissions", "starts_at": "2026-11-24T16:00:00+01:00",
-  "duration_min": 60, "location_md": "Room HG E 33 and Zoom" }
+  "note": "Everyone except Lea; Tuesday also fits the exercise sessions." }
 ```
 
-Returns the new `details` version and `links.calendar` (an `.ics` file for the
-announcement email).
+`starts_at` must be a slot where the whole meeting fits into the grid; `note`
+(optional, up to 500 characters) is shown with it. Returns the `suggestion`
+and `free_at` (`free`, `available`, `missing` for that time).
+
+After an organizer picks the time, `agent_get_meeting` shows it in
+`details.starts_at`. Draft the announcement with `links.pre`; organizers send
+the calendar invitation from the site ("Send Outlook invite").
 
 ## Content shapes
 
@@ -445,18 +491,28 @@ Locally, without a real project: `npm run dev:private` in the engine starts a
 preview with an in-memory database (base `http://localhost:4323/rest/v1`, no
 `apikey` needed). Create a key on its Team page.
 
+`npm run dev:example` (port 4325) is the same preview plus an example: ten
+made-up teammates have answered the survey of "Late submission policy", and
+its In-meeting tab has the AI summary an agent would write from them
+([`demo-private/example-responses.json`](../demo-private/example-responses.json)).
+Use it as a model for the `in` part: short headlines, the consensus with
+counts, key points, and "where people disagree" for split questions.
+
 ## The meeting lifecycle in calls
 
 1. **Draft the Pre-meeting part** with the person: `agent_get_course` (notes,
    earlier decisions and next steps) → `agent_create_meeting` →
    `agent_put_section` `pre`. The person checks the draft on the site and
    publishes it.
-2. **Votes and availability:** `agent_open_scheduling`.
+2. **Votes and availability:** `agent_open_scheduling` (or an organizer adds
+   the meeting on the site with "+ Add → Find a time").
 3. **Invitation email:** draft it with `links.pre` and `links.schedule` from
    `agent_get_meeting`. For a reminder, `agent_get_responses` and
-   `agent_get_availability` give the counts. **Time:** the agent may suggest
-   one (`agent_suggest_time`); an organizer picks it on the site → draft the
-   announcement with `links.calendar`.
+   `agent_get_availability` (`not_filled_in`) give the counts and names.
+   **Time:** when `agent_due` lists the `schedule` item as `"due"`, suggest
+   the best time (`agent_suggest_time`); an organizer picks it on the site and
+   sends the calendar invitation from there ("Send Outlook invite"). Then
+   draft the announcement with `links.pre`.
 4. **30 minutes before:** `agent_due` lists `in_summary` as due →
    `agent_get_responses` → `agent_put_section` `in`.
 5. **After the meeting:** the person gives the agent the transcript →

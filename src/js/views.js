@@ -1,6 +1,7 @@
 // Page templates. Each view returns { title, body } where body is SafeHtml.
 
 import { html, raw, link } from './dom.js';
+import { meetingTimes, outlookInviteUrl } from './calendar.js';
 
 export const TABS = [
   { id: 'pre', label: 'Pre-meeting' },
@@ -39,6 +40,19 @@ export function timeRange(meeting) {
   return meeting.duration ? `${meeting.time}–${addMinutes(meeting.time, meeting.duration)}` : meeting.time;
 }
 
+const shortDay = (s, opts) => new Date(`${s}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
+/** "Mon 23 – Fri 27 Nov" or "Mon 30 Nov – Fri 4 Dec". */
+export function daysLabel(a, b) {
+  const full = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (a === b) return shortDay(a, full);
+  return a.slice(0, 7) === b.slice(0, 7)
+    ? `${shortDay(a, { weekday: 'short', day: 'numeric' })} – ${shortDay(b, full)}`
+    : `${shortDay(a, full)} – ${shortDay(b, full)}`;
+}
+
+/** Where to add your times for a meeting that is still finding a time. */
+export const scheduleLink = (meeting) => `#/timeline?open=${encodeURIComponent(meeting.id)}`;
+
 export function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
@@ -70,7 +84,10 @@ function section(title, content, { className = '' } = {}) {
 // ---------- meetings list ----------
 
 // One row of a grouped list: title, date line, status on the right, chevron.
-function meetingRow(meeting, today) {
+// A meeting still finding a time also gets an "Add your availability" button
+// inside its row, which leads straight to its grid on the timeline. (A
+// separate link laid over the row: links can't be nested.)
+function meetingRow(meeting, today, members = 0) {
   const surveyCount = meeting.questions.filter((q) => q.survey.length).length;
   const status = [];
   if (meeting.draft) status.push(html`<span class="badge badge-draft">Draft</span>`);
@@ -78,26 +95,37 @@ function meetingRow(meeting, today) {
   if ((!meeting.date || meeting.date > today) && surveyCount) status.push(html`<span>${plural(surveyCount, 'survey question')}</span>`);
   if (meeting.decisions.length) status.push(html`<span class="status-ok">${plural(meeting.decisions.length, 'decision')}</span>`);
   if (meeting.date && meeting.date < today && !meeting.summary_html) status.push(html`<span class="status-warn">Summary pending</span>`);
+  const s = meeting.schedule;
+  const days = s?.days?.length ? daysLabel(s.days[0], s.days.at(-1)) : '';
   return html`
-    <li>
+    <li${s ? html` class="has-action"` : ''}>
       <a class="row-link" href="${link('m', meeting.id)}">
         <span class="row-text">
           <span class="row-title">${meeting.title}</span>
-          <span class="row-subtitle">${meeting.date ? formatDate(meeting.date) : 'Time not set yet'}${meeting.time ? ` · ${meeting.time}` : ''}</span>
+          <span class="row-subtitle">${s ? `Time not set yet · finding a time, ${days}`
+            : html`${meeting.date ? formatDate(meeting.date) : 'Time not set yet'}${meeting.time ? ` · ${meeting.time}` : ''}`}</span>
         </span>
         ${status.length ? html`<span class="row-meta">${status}</span>` : ''}
         <span class="chevron" aria-hidden="true"></span>
       </a>
+      ${s ? html`
+        <span class="row-action">
+          <a class="button button-small" href="${scheduleLink(meeting)}">${s.mine ? 'Change your availability' : 'Add your availability'}<span class="visually-hidden"> for ${meeting.title}</span></a>
+          ${members ? html`<span class="row-action-count">${s.filled_in} of ${members} answered</span>` : ''}
+        </span>` : ''}
     </li>`;
 }
 
 export function meetingsView(site, today = localToday()) {
   // Meetings without a time yet come last among the upcoming ones.
-  const upcoming = site.meetings.filter((m) => !m.date || m.date >= today)
-    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
-  const past = site.meetings.filter((m) => m.date && m.date < today); // already newest first
+  // (still finding a time: by the grid's first day)
+  const when = (m) => m.schedule?.days?.[0] || m.date || '9999';
+  const upcoming = site.meetings.filter((m) => m.schedule || !m.date || m.date >= today)
+    .sort((a, b) => when(a).localeCompare(when(b)));
+  const past = site.meetings.filter((m) => !m.schedule && m.date && m.date < today); // already newest first
+  const members = site.members?.length ?? 0;
   const list = (items, empty) => (items.length
-    ? html`<ul class="list">${items.map((m) => meetingRow(m, today))}</ul>`
+    ? html`<ul class="list">${items.map((m) => meetingRow(m, today, members))}</ul>`
     : html`<p class="muted">${empty}</p>`);
   return {
     title: 'Meetings',
@@ -270,11 +298,11 @@ function decideItem(meeting, question, index, state) {
             <div class="prose">${raw(summary.consensus_html)}</div>
           </div>` : hasSurvey && (state === 'waiting' || state === 'writing') ? html`
           <p class="consensus-pending muted" data-countdown-for>${state === 'waiting' ? 'Summary comes 30 minutes before the meeting.' : 'Summary is being written…'}</p>` : ''}
+        ${hasSurvey ? html`<div class="decide-tallies" data-tallies="${question.id}" hidden></div>` : ''}
         ${summary?.contested && summary.disagreement_html ? html`
           <div class="disagreement"><p class="consensus-label">Where people disagree</p><div class="prose">${raw(summary.disagreement_html)}</div></div>` : ''}
         ${summary?.key_points?.length ? html`
           <ul class="key-points">${summary.key_points.map((p) => html`<li>${raw(p)}</li>`)}</ul>` : ''}
-        ${hasSurvey ? html`<div class="decide-tallies" data-tallies="${question.id}" hidden></div>` : ''}
         ${short !== question.text || question.details_html ? html`
           <details class="decide-more">
             <summary>Full question${question.details_html ? ' and background' : ''}</summary>
@@ -390,7 +418,31 @@ function draftBanner(meeting, canPublish) {
     </div>`;
 }
 
-export function meetingView(meeting, tab, today = localToday(), { organizer = false } = {}) {
+// "Add to calendar" (everyone) and "Outlook invite" (organizers) for a
+// meeting with a time that is still ahead. calendar.js makes the file.
+function calendarActions(meeting, today, { organizer, pageUrl }) {
+  if (!meeting.date || meeting.date < today) return '';
+  const outlook = organizer ? outlookInviteUrl(meeting, { url: pageUrl }) : null;
+  if (!meetingTimes(meeting)) return '';
+  return html`
+    <p class="calendar-actions">
+      <button type="button" class="link-button" data-ics>Add to calendar</button>
+      ${outlook ? html`<a class="link-button" href="${outlook}" target="_blank" rel="noopener">Send Outlook invite<span class="visually-hidden"> (opens Outlook in a new tab)</span></a>` : ''}
+    </p>`;
+}
+
+// On a meeting that is still finding a time: ask for everyone's availability.
+function scheduleNotice(meeting, members) {
+  const s = meeting.schedule;
+  if (!s?.days?.length) return '';
+  return html`
+    <div class="notice notice-schedule">
+      <p><b>We’re finding a time for this meeting.</b> Mark when you’re free, ${daysLabel(s.days[0], s.days.at(-1))}.${members ? ` ${s.filled_in} of ${members} have answered so far.` : ''}</p>
+      <a class="button button-small button-primary" href="${scheduleLink(meeting)}">${s.mine ? 'Change your availability' : 'Add your availability'}</a>
+    </div>`;
+}
+
+export function meetingView(meeting, tab, today = localToday(), { organizer = false, pageUrl, members = 0 } = {}) {
   const content = tab === 'during' ? duringTab(meeting) : tab === 'post' ? postTab(meeting, today) : preTab(meeting);
   const label = TABS.find((t) => t.id === tab)?.label ?? '';
   const saved = meeting.saved?.[tab === 'during' ? 'in' : tab];
@@ -400,6 +452,8 @@ export function meetingView(meeting, tab, today = localToday(), { organizer = fa
       <p class="breadcrumb"><a href="#/">‹ All meetings</a></p>
       <h1 tabindex="-1">${meeting.title}</h1>
       ${meetingFacts(meeting)}
+      ${calendarActions(meeting, today, { organizer, pageUrl })}
+      ${scheduleNotice(meeting, members)}
       <nav class="tabs" aria-label="Meeting sections">
         ${TABS.map((t) => html`<a href="${link('m', meeting.id, t.id)}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}
       </nav>

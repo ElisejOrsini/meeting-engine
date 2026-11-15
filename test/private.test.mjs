@@ -274,7 +274,8 @@ test('private: agent keys work for one course, can be read-only, and can be revo
   // Create a meeting: always a draft, saved by the agent.
   const created = await agent(`select public.agent_create_meeting('poll', 'Poll', duration_min => 60)`);
   assert.deepEqual(created, { id: 'poll', published: false,
-    links: { pre: `${SITE}#/m/poll/pre`, in: `${SITE}#/m/poll/during`, post: `${SITE}#/m/poll/post` } });
+    links: { pre: `${SITE}#/m/poll/pre`, in: `${SITE}#/m/poll/during`, post: `${SITE}#/m/poll/post`,
+      schedule: `${SITE}#/timeline?open=poll` } });
   await assert.rejects(agent(`select public.agent_create_meeting('poll', 'Again')`), code('PT409'));
   const put = await agent(`select public.agent_put_section('poll', 'pre', 0, $1, 'first draft')`, [JSON.stringify(PRE)]);
   assert.equal(put.version, 1);

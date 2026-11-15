@@ -12,8 +12,10 @@
 // the real database setup in a local, in-memory database (scripts/local-backend.mjs),
 // and the site talks to it instead of Supabase, with pretend sign-in
 // (scripts/local-supabase.js). --import <folder> first imports a content
-// folder through the agent API, and publishes its meetings. Nothing is saved:
-// restarting the server starts from scratch.
+// folder through the agent API, and publishes its meetings. --example <file>
+// then adds made-up survey answers from pretend teammates and the AI summary
+// an agent would write from them (demo-private/example-responses.json).
+// Nothing is saved: restarting the server starts from scratch.
 //
 // --hub <folder> --base <path> preview a site that has other pages next to the
 // meeting site (like AIP-PAGE): files from <folder> are served at /, and the
@@ -36,6 +38,7 @@ const { values } = parseArgs({
     'mock-backend': { type: 'boolean', default: false },
     'local-backend': { type: 'boolean', default: false },
     import: { type: 'string' },
+    example: { type: 'string' },
     hub: { type: 'string' },
     base: { type: 'string', default: '' },
   },
@@ -117,6 +120,7 @@ if (values['local-backend']) {
     courseName: content.site.course.name,
     siteUrl: `${ORIGIN}${SITE_PREFIX}`,
     importFrom: values.import,
+    exampleFrom: values.example,
   });
 }
 

@@ -13,8 +13,11 @@ teams). Each meeting gets three tabs:
 
 The **Timeline** (new in v0.7.0) shows every meeting on one vertical line,
 week by week, with today in the middle: past meetings with their decisions,
-upcoming ones with what to prepare. Scheduling, tasks and written check-ins
-follow (see [docs/redesign-plan.md](docs/redesign-plan.md)).
+upcoming ones with what to prepare. Since v0.8.0 (private courses) it also
+**finds a time** for a meeting, when2meet style: everyone marks when they're
+free, the site shows the best times, an organizer picks one and sends the
+calendar invitation. Tasks and written check-ins follow (see
+[docs/redesign-plan.md](docs/redesign-plan.md)).
 
 Team members can sign in with GitHub and answer the surveys. Only people on the
 course's team list can sign in; the list lives in the course repository.
@@ -47,7 +50,7 @@ meeting-engine (this repo, public)          course repo (one per course)
 - On every push, GitHub Actions builds the site and publishes it on
   GitHub Pages. No server is needed.
 - Course repos use the engine at a pinned version
-  (`uses: ElisejOrsini/meeting-engine@v0.7.0`). To give a course a newer
+  (`uses: ElisejOrsini/meeting-engine@v0.8.0`). To give a course a newer
   engine, change the version in its workflow (in every `uses:` line of the
   engine, if there are several).
 - The permanent record (summaries and decisions) always lives in git.
@@ -67,8 +70,8 @@ meeting-engine (this repo, public)          course repo (one per course)
 | 5 | Private courses: content in the database, organizers, Team page, drafts, versions, agent keys, import tool | done (v0.5.0) |
 | 6 | In-meeting tab as its own agenda: AI summary, live vote counts, Skip; agent API for survey results | done (v0.6.0) |
 | 7 | Timeline instead of the Decisions page (meetings on one line) | done (v0.7.0) |
-| 8 | Scheduling on the timeline (when2meet-style grid; the agent suggests, an organizer picks) | next (v0.8.0) |
-| 9 | Tasks and written check-ins on the timeline | planned (v0.9.0) |
+| 8 | Scheduling on the timeline (when2meet-style grid; the agent suggests, an organizer picks) | done (v0.8.0) |
+| 9 | Tasks and written check-ins on the timeline | next (v0.9.0) |
 | 10 | Backups (nightly export) and clean-up | planned |
 
 The plan and its reasons: [docs/architecture.md](docs/architecture.md).
@@ -174,7 +177,7 @@ To preview another content folder: `node scripts/dev-server.mjs --content ../my-
 2. Make the change, run `npm test`, push to `main`, and check the demo site.
 3. In one commit, update `version` in `package.json`, every version in
    `templates/course/` (`npm test` checks them) and the docs' snippets. Push,
-   then tag it, e.g. `git tag v0.7.0 && git push origin v0.7.0`.
+   then tag it, e.g. `git tag v0.8.0 && git push origin v0.8.0`.
 4. In each course repo, change the version in every `ElisejOrsini/meeting-engine…@`
    line of `.github/workflows/` (build, sync and keep-alive must match).
 

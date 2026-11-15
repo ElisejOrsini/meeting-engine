@@ -83,6 +83,7 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     await denied(role, 'select * from private.meetings');
     await denied(role, 'select * from private.answers');
     await denied(role, 'select private.delete_old_answers()');
+    await denied(role, 'select private.delete_old_availability()');
     await denied(role, `select public.hook_before_user_created('{}'::jsonb)`);
   }
   await denied('authenticated', 'select public.keepalive()');
@@ -195,6 +196,39 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
     'private.skip_question(text, text, text)': ['authenticated'],
     'public.skip_question(text, text, text)': ['authenticated', 'service_role'],
     'private.unskip_answer()': [],
+    // Part 5, finding a time: the team reads and fills in grids, organizers
+    // add meetings and pick the time, agents open grids and suggest a time.
+    'private.get_schedule(text, text)': ['authenticated'],
+    'public.get_schedule(text, text)': ['authenticated', 'service_role'],
+    'private.save_availability(text, text, jsonb)': ['authenticated'],
+    'public.save_availability(text, text, jsonb)': ['authenticated', 'service_role'],
+    'private.add_meeting(text, jsonb, jsonb)': ['authenticated'],
+    'public.add_meeting(text, jsonb, jsonb)': ['authenticated', 'service_role'],
+    'private.pick_time(text, text, text)': ['authenticated'],
+    'public.pick_time(text, text, text)': ['authenticated', 'service_role'],
+    'private.cancel_schedule(text, text)': ['authenticated'],
+    'public.cancel_schedule(text, text)': ['authenticated', 'service_role'],
+    'private.agent_open_scheduling(text, jsonb)': ['anon'],
+    'public.agent_open_scheduling(text, jsonb, text, text, integer, integer)': ['anon', 'service_role'],
+    'private.agent_get_availability(text)': ['anon'],
+    'public.agent_get_availability(text)': ['anon', 'service_role'],
+    'private.agent_suggest_time(text, text, text)': ['anon'],
+    'public.agent_suggest_time(text, text, text)': ['anon', 'service_role'],
+    'private.grid_slots(date[], time without time zone, time without time zone, integer)': [],
+    'private.schedule_grid(private.schedules)': [],
+    'private.meeting_slots(private.schedules, timestamp with time zone)': [],
+    'private.parse_schedule(jsonb, integer)': [],
+    'private.store_schedule(text, text, private.schedules)': [],
+    'private.schedule_expired(text, text)': [],
+    'private.schedule_end(private.schedules, date)': [],
+    'private.visible_schedule(text, text)': [],
+    'private.valid_start(private.schedules, text)': [],
+    'private.free_at(private.schedules, timestamp with time zone)': [],
+    'private.best_times(private.schedules, integer)': [],
+    'private.schedule_json(private.schedules, integer)': [],
+    'private.schedule_summary(private.schedules, bigint)': [],
+    'private.meeting_id_for(text, date, text)': [],
+    'private.delete_old_availability()': [],
   };
   for (const [fn, allowed] of Object.entries(expected)) {
     for (const role of ['anon', 'authenticated', 'service_role', 'supabase_auth_admin']) {
@@ -205,18 +239,20 @@ test('database: visitors can\'t read or change anything they shouldn\'t', async 
   const privateFns = await db.query(`select p.oid::regprocedure::text as fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private'`);
   const listed = new Set(Object.keys(expected).map((fn) => fn.replaceAll(' ', '')));
   for (const { fn } of privateFns.rows) {
-    if (!listed.has(fn)) assert.equal(await may('anon', fn), false, `anon execute ${fn}`);
-    assert.ok(listed.has(fn), `new private function ${fn}: add it to the expected permissions above`);
+    const known = listed.has(fn.replaceAll(' ', ''));
+    if (!known) assert.equal(await may('anon', fn), false, `anon execute ${fn}`);
+    assert.ok(known, `new private function ${fn}: add it to the expected permissions above`);
   }
 
   // Nothing else is reachable through the API (functions in "public").
   const fns = await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1`);
   assert.deepEqual(fns.rows.map((x) => x.proname),
-    ['add_member', 'agent_create_meeting', 'agent_due', 'agent_get_course', 'agent_get_meeting', 'agent_get_responses',
-     'agent_put_course_notes', 'agent_put_section', 'agent_update_meeting', 'agent_whoami', 'create_agent_key', 'create_meeting',
-     'get_answers', 'get_course', 'get_tallies', 'get_version', 'get_versions', 'hook_before_user_created', 'is_member',
-     'keepalive', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_part', 'set_published', 'skip_question',
-     'sync_course', 'sync_meetings', 'update_course', 'update_member']);
+    ['add_meeting', 'add_member', 'agent_create_meeting', 'agent_due', 'agent_get_availability', 'agent_get_course',
+     'agent_get_meeting', 'agent_get_responses', 'agent_open_scheduling', 'agent_put_course_notes', 'agent_put_section',
+     'agent_suggest_time', 'agent_update_meeting', 'agent_whoami', 'cancel_schedule', 'create_agent_key', 'create_meeting',
+     'get_answers', 'get_course', 'get_schedule', 'get_tallies', 'get_version', 'get_versions', 'hook_before_user_created',
+     'is_member', 'keepalive', 'pick_time', 'remove_member', 'revoke_agent_key', 'save_answer', 'save_availability',
+     'save_part', 'set_published', 'skip_question', 'sync_course', 'sync_meetings', 'update_course', 'update_member']);
   const tables = await db.query(`select count(*)::int as n from pg_tables where schemaname = 'public'`);
   assert.equal(tables.rows[0].n, 0, 'no tables in the API schema');
 });

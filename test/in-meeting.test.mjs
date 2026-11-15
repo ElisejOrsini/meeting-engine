@@ -191,3 +191,18 @@ test('in-meeting: agent_due lists summaries to write until every survey question
   const over = await course({ startsInMinutes: -90 });
   assert.deepEqual((await over.agent('select public.agent_due()')).items, [], 'not listed after the meeting');
 });
+
+test('in-meeting: a question with an AI summary shows its counts to everyone (after_answering)', async () => {
+  const { alice, bob, json, agent } = await course({ reveal: 'after_answering' });
+  await alice(`select public.save_answer('widgetry', 'kickoff', 'grace', '{"pick": "1 hour"}')`);
+  let t = await json(bob, `select public.get_tallies('widgetry', 'kickoff')`);
+  assert.deepEqual(t.locked, ['grace'], 'locked before the summary');
+  const meeting = await agent(`select public.agent_get_meeting('kickoff')`);
+  await agent(`select public.agent_put_section('kickoff', 'in', $1, $2)`, [meeting.in.version,
+    JSON.stringify({ items: [{ title: 'Grace', question: 'grace', consensus_md: 'Everyone who answered wants 1 hour.' }] })]);
+  t = await json(bob, `select public.get_tallies('widgetry', 'kickoff')`);
+  assert.deepEqual(t.locked, [], 'unlocked once summarized');
+  assert.equal(t.questions.grace.answered, 1);
+  const answers = await bob(`select * from public.get_answers('widgetry', 'kickoff', true)`);
+  assert.ok(!JSON.stringify(answers).includes('1 hour'), 'others’ answers themselves (with names) stay hidden');
+});

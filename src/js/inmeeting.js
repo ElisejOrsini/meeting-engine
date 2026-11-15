@@ -1,7 +1,8 @@
 // The In-meeting tab, once drawn (views.js): keeps the countdown to the AI
-// summary ticking, fills in the vote counts for signed-in team members
-// (public.get_tallies: counts only, no names; with "after_answering" only for
-// questions you answered or skipped) and refreshes them every
+// summary ticking, draws the vote counts as a small chart under each
+// question's summary for signed-in team members (public.get_tallies: counts
+// only, no names; with "after_answering" only for questions you answered or
+// skipped, or that already have an AI summary) and refreshes them every
 // minute, and lets "Q2" in the agenda jump to that question on the same tab.
 // Who may see the counts, and when, is decided by the database.
 
@@ -22,33 +23,39 @@ function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
-// The bars start folded once the AI summary is there (it already says what
-// they show), and open while there is no summary.
-function tallyView(question, tally, open) {
+// The results of one question as a small bar chart per choice field: one
+// bar per option in the survey's order (options often have an order, like
+// "15 minutes … 24 hours"), the leading option in full accent, the others
+// lighter; every bar labelled with its count and share, so nothing depends on
+// colour. Counts only, never names.
+export function tallyView(question, tally) {
   const fields = question.survey.filter((f) => f.type !== 'text');
   const byId = new Map((tally?.fields ?? []).map((f) => [f.id, f]));
   const answered = tally?.answered ?? 0;
   const skipped = tally?.skipped ?? 0;
-  const label = `${plural(answered, 'answer')}${skipped ? ` · ${skipped} skipped` : ''}`;
   if (!answered) return html`<p class="muted small">${skipped ? `No votes yet · ${skipped} skipped` : 'No survey answers yet.'}</p>`;
-  return html`
-    <details class="decide-votes" ${open ? 'open' : ''}>
-    <summary>${label}</summary>
-    ${fields.map((field) => {
-      const counts = byId.get(field.id)?.counts ?? field.options.map((option) => ({ option, count: 0 }));
-      return html`
-        <div class="response-field">
-          ${fields.length > 1 ? html`<p class="response-label">${field.label}</p>` : ''}
-          <ul class="tally">${counts.map((c) => html`
-            <li>
-              <span class="tally-option">${c.option}</span>
-              <span class="tally-bar" aria-hidden="true"><span data-share="${Math.round((100 * c.count) / answered)}"></span></span>
-              <span class="tally-count">${c.count}</span>
-            </li>`)}
-          </ul>
-        </div>`;
-    })}
-    </details>`;
+  const meta = `${plural(answered, 'answer')}${skipped ? ` · ${skipped} skipped` : ''}`;
+  return html`${fields.map((field, i) => {
+    const counts = byId.get(field.id)?.counts ?? field.options.map((option) => ({ option, count: 0 }));
+    const top = Math.max(...counts.map((c) => c.count));
+    return html`
+      <figure class="decide-chart">
+        <figcaption>
+          <span class="decide-chart-title">${field.label}</span>
+          <span class="decide-chart-meta">${i === 0 ? meta : ''}${field.type === 'multiple' ? `${i === 0 ? ' · ' : ''}more than one choice allowed` : ''}</span>
+        </figcaption>
+        <ul class="chart-bars">${counts.map((c) => {
+          const share = Math.round((100 * c.count) / answered);
+          return html`
+            <li class="${c.count === top && top > 0 ? 'is-top' : ''}" title="${c.option}: ${c.count} of ${answered} (${share}%)">
+              <span class="chart-label">${c.option}</span>
+              <span class="chart-track" aria-hidden="true"><span class="chart-bar" data-share="${share}"></span></span>
+              <span class="chart-value">${c.count}<span class="chart-share"> · ${share}%</span></span>
+            </li>`;
+        })}
+        </ul>
+      </figure>`;
+  })}`;
 }
 
 /** Bring a rendered In-meeting tab of `meeting` to life. */
@@ -110,8 +117,7 @@ export function attachInMeeting(root, meeting, backend) {
       if ((data.locked ?? []).includes(question.id)) {
         box.innerHTML = String(html`<p class="muted small">Answer or skip this question on the Pre-meeting tab to see the votes.${forAll}</p>`);
       } else {
-        const open = box.querySelector('details')?.open ?? !box.closest('.decide-item').querySelector('.consensus');
-        box.innerHTML = String(tallyView(question, data.questions?.[question.id], open));
+        box.innerHTML = String(tallyView(question, data.questions?.[question.id]));
         for (const bar of box.querySelectorAll('[data-share]')) bar.style.width = `${bar.dataset.share}%`;
       }
       box.hidden = false;

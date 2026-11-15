@@ -10,12 +10,17 @@
 // - The line is solid up to today and dashed after it.
 // - A click on a meeting opens a sheet with its facts, summary and
 //   decisions, and "Open meeting".
+// - A meeting that is still finding a time ("planned meeting") sits on the
+//   first day of its grid, with its days shaded; its sheet is the
+//   availability grid (schedule.js). Organizers add meetings with "+ Add".
 //
 // Dates are "YYYY-MM-DD" strings (Zurich time, like the rest of the site);
 // the arithmetic below works on them in UTC so no time zone can shift a day.
 
 import { html, raw, link } from './dom.js';
-import { localToday, meetingFacts, timeRange, plural } from './views.js';
+import { localToday, meetingFacts, timeRange, plural, daysLabel } from './views.js';
+import { openSchedule } from './schedule.js';
+import { zurichToDate } from './calendar.js';
 
 const DAY_MS = 864e5;
 const DETAIL_WEEKS = 3; // this week and the next two: day by day
@@ -68,13 +73,31 @@ export function relativeDay(date, today) {
   return '';
 }
 
-// Small line icons, one per kind of item (more kinds come with scheduling,
-// tasks and check-ins).
+// Small line icons, one per kind of item (tasks and check-ins come later).
 const ICONS = {
   meeting: raw('<circle cx="6" cy="5.6" r="2.2"/><path d="M2.2 13.2c0-2.2 1.7-3.8 3.8-3.8s3.8 1.6 3.8 3.8"/><circle cx="11.3" cy="6.3" r="1.7"/><path d="M11.2 9.5c1.8 0 3 1.4 3 3.3"/>'),
+  window: raw('<circle cx="8" cy="8" r="5.8"/><path d="M8 4.9V8l2.1 1.5"/>'),
 };
 function chip(kind, past) {
   return html`<span class="chip chip-${kind} ${past ? 'is-past' : 'is-upcoming'}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[kind]}</svg></span>`;
+}
+
+export { daysLabel };
+
+// What the line shows: meetings with a date, and meetings still finding a
+// time ("planned"), which sit on the first day of their grid.
+function itemsOf(site) {
+  const members = site.members?.length ?? 0;
+  const items = [];
+  for (const meeting of site.meetings) {
+    const s = meeting.schedule;
+    if (s?.days?.length) {
+      items.push({ kind: 'window', meeting, date: s.days[0], end: s.days.at(-1), days: s.days, members });
+    } else if (meeting.date) {
+      items.push({ kind: 'meeting', meeting, date: meeting.date });
+    }
+  }
+  return items.sort((a, b) => a.date.localeCompare(b.date) || (a.meeting.time ?? '').localeCompare(b.meeting.time ?? ''));
 }
 
 function meetingSubtitle(meeting, past) {
@@ -84,18 +107,24 @@ function meetingSubtitle(meeting, past) {
   return meeting.summary_html ? 'Summary written' : 'Summary pending';
 }
 
-function itemRow(meeting, { today, showDate }) {
-  const past = meeting.date < today;
-  const when = past ? 'is-past' : 'is-future'; // today's meetings come after the today row
-  const rel = relativeDay(meeting.date, today);
+function itemRow(item, { today, showDate }) {
+  const { meeting } = item;
+  const planned = item.kind === 'window';
+  const past = (planned ? item.end : item.date) < today;
+  const when = item.date < today ? 'is-past' : 'is-future'; // today's items come after the today row
+  const rel = relativeDay(item.date, today);
+  const s = meeting.schedule;
   return html`
-    <button type="button" class="tl-item tl-row ${when} kind-meeting ${past ? 'is-done' : 'is-upcoming'}" data-open="${meeting.id}" aria-haspopup="dialog">
-      <span class="tl-date">${showDate ? html`<span class="tl-wd">${dayLabel(meeting.date)}</span>${rel ? html`<span class="tl-rel">${rel}</span>` : ''}` : ''}</span>
-      <span class="tl-rail">${chip('meeting', past)}</span>
+    <button type="button" class="tl-item tl-row ${when} kind-${item.kind} ${past ? 'is-done' : 'is-upcoming'}" data-open="${meeting.id}" aria-haspopup="dialog">
+      <span class="tl-date">${showDate ? html`<span class="tl-wd">${dayLabel(item.date)}</span>${rel ? html`<span class="tl-rel">${rel}</span>` : ''}` : ''}</span>
+      <span class="tl-rail">${chip(item.kind, past)}</span>
       <span class="tl-card">
-        <span class="tl-kind">Meeting${meeting.draft ? ' · Draft' : ''}</span>
+        <span class="tl-kind">${planned ? 'Planned meeting' : 'Meeting'}${meeting.draft ? ' · Draft' : ''}</span>
         <span class="tl-title">${meeting.title}</span>
-        <span class="tl-sub">${meetingSubtitle(meeting, past)}</span>
+        <span class="tl-sub">${planned
+          ? `${daysLabel(item.date, item.end)} · ${s.filled_in} of ${item.members} answered`
+          : meetingSubtitle(meeting, past)}</span>
+        ${planned ? html`<span class="tl-cta">${s.mine ? 'Change your times' : 'Add your times'}</span>` : ''}
       </span>
     </button>`;
 }
@@ -116,18 +145,23 @@ function weekHead(weekStart, { toWeek = weekStart, quiet = false, first, today, 
     </h3>`;
 }
 
+function sheetHeader(id, label, title) {
+  return html`
+    <header class="sheet-header">
+      <div class="sheet-heading">
+        <p class="question-label">${label}</p>
+        <h2 class="sheet-title" id="tl-title-${id}" tabindex="-1">${title}</h2>
+      </div>
+      <button type="button" class="sheet-close" data-action="close" aria-label="Close"></button>
+    </header>`;
+}
+
 function meetingSheet(meeting, today) {
   const past = meeting.date ? meeting.date < today : false;
   const questions = meeting.questions.length;
   return html`
     <dialog class="sheet tl-sheet" data-sheet="${meeting.id}" aria-labelledby="tl-title-${meeting.id}">
-      <header class="sheet-header">
-        <div class="sheet-heading">
-          <p class="question-label">Meeting${meeting.draft ? ' · Draft' : ''}</p>
-          <h2 class="sheet-title" id="tl-title-${meeting.id}" tabindex="-1">${meeting.title}</h2>
-        </div>
-        <button type="button" class="sheet-close" data-action="close" aria-label="Close"></button>
-      </header>
+      ${sheetHeader(meeting.id, `Meeting${meeting.draft ? ' · Draft' : ''}`, meeting.title)}
       <div class="sheet-body">
         ${meetingFacts(meeting)}
         ${past ? html`
@@ -143,23 +177,95 @@ function meetingSheet(meeting, today) {
     </dialog>`;
 }
 
+// The availability sheet of a planned meeting; schedule.js fills it in.
+function plannedSheet(meeting) {
+  return html`
+    <dialog class="sheet sheet-wide tl-sheet" data-sheet="${meeting.id}" data-schedule="${meeting.id}" aria-labelledby="tl-title-${meeting.id}">
+      ${sheetHeader(meeting.id, `Planned meeting · find a time${meeting.draft ? ' · Draft' : ''}`, meeting.title)}
+      <div class="sheet-body">
+        <div class="av" data-av><p class="muted">Loading…</p></div>
+        <p class="tl-sheet-actions"><a class="link-button" href="${link('m', meeting.id)}">Open the meeting page (pre-reading and questions)</a></p>
+      </div>
+    </dialog>`;
+}
+
+// "+ Add" for organizers: a meeting that still has to find a time, or one
+// with a fixed time. Both are visible to the team at once.
+function addSheet(today) {
+  const monday = addDays(weekStartOf(today), 7);
+  return html`
+    <dialog class="sheet tl-sheet" data-sheet="__add" aria-labelledby="tl-title-add">
+      ${sheetHeader('add', 'Organizers', 'Add to the timeline')}
+      <div class="sheet-body">
+        <form class="tl-add" novalidate>
+          <fieldset class="field">
+            <legend>What</legend>
+            <div class="options">
+              <label class="option"><input type="radio" name="kind" value="find" checked> <span>Find a time for a meeting</span></label>
+              <label class="option"><input type="radio" name="kind" value="fixed"> <span>Meeting with a fixed time</span></label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="add-title">Title</label>
+            <input id="add-title" name="title" class="text-input" maxlength="200" autocomplete="off" placeholder="e.g. Exam preparation">
+          </div>
+          <div data-for="find">
+            <div class="add-row">
+              <div class="field"><label for="add-from">First day</label><input id="add-from" name="from" type="date" class="text-input" value="${monday}" min="${today}"></div>
+              <div class="field"><label for="add-to">Last day</label><input id="add-to" name="to" type="date" class="text-input" value="${addDays(monday, 4)}" min="${today}"></div>
+            </div>
+            <div class="add-row">
+              <div class="field"><label for="add-start">Earliest start</label><input id="add-start" name="start" type="time" step="1800" class="text-input" value="09:00"></div>
+              <div class="field"><label for="add-end">Latest end</label><input id="add-end" name="end" type="time" step="1800" class="text-input" value="18:00"></div>
+            </div>
+            <label class="option add-weekends"><input type="checkbox" name="weekends"> <span>Include Saturdays and Sundays</span></label>
+          </div>
+          <div data-for="fixed" hidden>
+            <div class="add-row">
+              <div class="field"><label for="add-date">Date</label><input id="add-date" name="date" type="date" class="text-input" value="${monday}" min="${today}"></div>
+              <div class="field"><label for="add-time">Time</label><input id="add-time" name="time" type="time" step="900" class="text-input" value="14:00"></div>
+            </div>
+            <div class="field"><label for="add-place">Place <span class="muted">(optional)</span></label><input id="add-place" name="place" class="text-input" maxlength="300" autocomplete="off" placeholder="e.g. HG E 33 and Zoom"></div>
+          </div>
+          <div class="field">
+            <label for="add-length">Length</label>
+            <select id="add-length" name="duration" class="text-input">
+              <option value="30">30 minutes</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1½ hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
+          <div class="survey-actions">
+            <button type="submit" class="button button-primary">Add to timeline</button>
+            <span class="survey-status" role="status"></span>
+          </div>
+        </form>
+      </div>
+    </dialog>`;
+}
+
 /** The rows of the line, from `start` to `end`, with month headings. */
-function lineRows(meetings, { today, semester, start, end }) {
+function lineRows(items, { today, semester, start, end }) {
   const byDate = new Map();
-  for (const m of meetings) {
-    if (!byDate.has(m.date)) byDate.set(m.date, []);
-    byDate.get(m.date).push(m);
+  const busy = new Set(); // days with something on (all days of a planned meeting's grid)
+  for (const item of items) {
+    if (!byDate.has(item.date)) byDate.set(item.date, []);
+    byDate.get(item.date).push(item);
+    for (const d of item.days ?? [item.date]) busy.add(d);
   }
+  const windows = items.filter((it) => it.kind === 'window');
+  const windowOn = (d) => windows.find((w) => d >= w.date && d <= w.end);
   const thisWeek = weekStartOf(today);
   const lastDetailWeek = addDays(thisWeek, 7 * (DETAIL_WEEKS - 1));
   const isDetailWeek = (ws) => ws >= thisWeek && ws <= lastDetailWeek;
-  const hasItems = (ws) => [0, 1, 2, 3, 4, 5, 6].some((i) => byDate.has(addDays(ws, i)));
+  const hasItems = (ws) => [0, 1, 2, 3, 4, 5, 6].some((i) => busy.has(addDays(ws, i)));
   const when = (d) => (d < today ? 'is-past' : d === today ? 'is-today' : 'is-future');
 
   const weeks = [];
   for (let ws = weekStartOf(start); ws <= end; ws = addDays(ws, 7)) weeks.push(ws);
 
-  const rows = []; // [date, html]
+  const rows = []; // [date, html, isClosingTag]
   for (let i = 0; i < weeks.length; i += 1) {
     const ws = weeks[i];
     const first = maxDate(ws, start);
@@ -173,10 +279,34 @@ function lineRows(meetings, { today, semester, start, end }) {
       continue;
     }
     rows.push([first, weekHead(ws, { first, today, semester })]);
+    // Far from today, a planned meeting that started in an earlier week gets
+    // a short shaded row here, so its band doesn't seem to end early.
+    if (!isDetailWeek(ws)) {
+      for (const w of windows.filter((x) => x.date < ws && x.end >= ws)) {
+        rows.push([first, html`
+          <div class="tl-span"><div class="tl-dayrow tl-row ${when(first)} is-offered is-continued">
+            <span class="tl-date">until ${dayLabel(w.end)}</span>
+            <span class="tl-rail"><i class="tl-daytick"></i></span>
+            <span class="tl-continued">${w.meeting.title}: still finding a time</span>
+          </div></div>`]);
+      }
+    }
+    // Near today, a planned meeting's days sit inside a shaded band.
+    let band = null;
+    const closeBand = () => {
+      if (band) rows.push([band, raw('</div>'), 'close']);
+      band = null;
+    };
     for (let k = 0; k < 7; k += 1) {
       const d = addDays(ws, k);
       if (d < start || d > end) continue;
       const list = byDate.get(d) ?? [];
+      const win = isDetailWeek(ws) ? windowOn(d) : null;
+      if (band && !win) closeBand();
+      if (win && !band) {
+        band = d;
+        rows.push([d, raw('<div class="tl-span">'), 'open']);
+      }
       if (d === today) {
         rows.push([d, html`
           <div class="tl-today tl-row is-today" id="tl-today">
@@ -185,27 +315,41 @@ function lineRows(meetings, { today, semester, start, end }) {
             <span class="tl-today-line">Today</span>
           </div>`]);
       }
-      list.forEach((m, n) => rows.push([d, itemRow(m, { today, showDate: n === 0 && d !== today })]));
+      list.forEach((item, n) => {
+        const row = itemRow(item, { today, showDate: n === 0 && d !== today });
+        // Far from today a planned meeting has no day rows: shade just its row.
+        rows.push([d, item.kind === 'window' && !isDetailWeek(ws)
+          ? html`<div class="tl-span"><span class="tl-span-end">until ${dayLabel(item.end)}</span>${row}</div>` : row]);
+      });
       if (!list.length && isDetailWeek(ws) && d !== today) {
+        const offered = win?.days.includes(d);
         rows.push([d, html`
-          <div class="tl-dayrow tl-row ${when(d)}${k >= 5 ? ' is-weekend' : ''}" aria-hidden="true">
+          <div class="tl-dayrow tl-row ${when(d)}${k >= 5 ? ' is-weekend' : ''}${offered ? ' is-offered' : ''}" aria-hidden="true">
             <span class="tl-date">${dayLabel(d)}</span>
             <span class="tl-rail"><i class="tl-daytick"></i></span>
             <span></span>
           </div>`]);
       }
     }
+    closeBand();
   }
 
+  // Month headings go where the month changes; never inside a band (it is
+  // closed before the heading and opened again after it).
   const out = [];
   let month = '';
+  let inBand = false;
   const thisYear = today.slice(0, 4);
-  for (const [d, part] of rows) {
-    if (d.slice(0, 7) !== month) {
+  for (const [d, part, kind] of rows) {
+    if (kind !== 'close' && d.slice(0, 7) !== month) {
       month = d.slice(0, 7);
       const name = fmt(d, { month: 'long' }) + (d.slice(0, 4) === thisYear ? '' : ` ${d.slice(0, 4)}`);
+      if (inBand) out.push(raw('</div>'));
       out.push(html`<h2 class="tl-month tl-row ${d <= today ? 'is-past' : 'is-future'}">${name}</h2>`);
+      if (inBand && kind !== 'open') out.push(raw('<div class="tl-span">'));
     }
+    if (kind === 'open') inBand = true;
+    if (kind === 'close') inBand = false;
     out.push(part);
   }
   return out;
@@ -213,20 +357,24 @@ function lineRows(meetings, { today, semester, start, end }) {
 
 export function timelineView(site, { today = localToday() } = {}) {
   const semester = site.course.semester ?? null;
-  const dated = site.meetings.filter((m) => m.date)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
-  const undated = site.meetings.filter((m) => !m.date);
+  const items = itemsOf(site);
+  const undated = site.meetings.filter((m) => !m.date && !m.schedule);
   const semesterEnd = semester ? addDays(weekStartOf(semester.start), semester.weeks * 7 - 1) : null;
-  const start = minDate(today, dated[0]?.date, semester?.start && weekStartOf(semester.start));
-  const end = maxDate(addDays(weekStartOf(today), 7 * DETAIL_WEEKS - 1), dated.at(-1)?.date, semesterEnd);
+  const start = minDate(today, items[0]?.date, semester?.start && weekStartOf(semester.start));
+  const end = maxDate(addDays(weekStartOf(today), 7 * DETAIL_WEEKS - 1), ...items.map((it) => it.end ?? it.date), semesterEnd);
+  const organizer = site.private && site.me?.organizer === true;
   return {
     title: 'Timeline',
     body: html`
-      <h1 tabindex="-1">Timeline</h1>
+      <div class="tl-head">
+        <h1 tabindex="-1">Timeline</h1>
+        ${organizer ? html`<button type="button" class="button button-small" data-open="__add" aria-haspopup="dialog">+ Add</button>` : ''}
+      </div>
       ${undated.length ? html`
         <p class="muted small tl-undated">No time set yet: ${undated.map((m, i) => html`${i ? ', ' : ''}<a href="${link('m', m.id)}">${m.title}</a>`)}</p>` : ''}
-      <div class="tl">${lineRows(dated, { today, semester, start, end })}</div>
-      ${dated.map((m) => meetingSheet(m, today))}`,
+      <div class="tl">${lineRows(items, { today, semester, start, end })}</div>
+      ${items.map((it) => (it.kind === 'window' ? plannedSheet(it.meeting) : meetingSheet(it.meeting, today)))}
+      ${organizer ? addSheet(today) : ''}`,
   };
 }
 
@@ -239,11 +387,38 @@ export function detachTimeline() {
   detachCurrent = null;
 }
 
-/** Opens and closes the sheets of a drawn timeline. */
-export function attachTimeline(root) {
+/** The days from `from` to `to` (inclusive), without weekends unless asked. */
+export function daysBetweenDates(from, to, { weekends = false } = {}) {
+  const days = [];
+  for (let d = from; d <= to && days.length < 60; d = addDays(d, 1)) {
+    if (weekends || weekdayOf(d) < 5) days.push(d);
+  }
+  return days;
+}
+
+/**
+ * Opens and closes the sheets of a drawn timeline, fills in the availability
+ * sheets (schedule.js) and sends "+ Add". `open`: a meeting id whose sheet
+ * opens right away (links like #/timeline?open=<id>).
+ */
+export function attachTimeline(root, { site, client, reload, open } = {}) {
   detachTimeline();
   const stop = new AbortController();
   const sheetFor = (id) => root.querySelector(`dialog.tl-sheet[data-sheet="${CSS.escape(id)}"]`);
+  const meetings = new Map(site.meetings.map((m) => [m.id, m]));
+  let changed = false; // something was saved in a sheet: redraw the line when it closes
+
+  function openSheet(id) {
+    const sheet = sheetFor(id);
+    if (!sheet || sheet.open) return;
+    sheet.showModal();
+    sheet.querySelector('.sheet-title')?.focus();
+    if (sheet.dataset.schedule) {
+      openSchedule(sheet.querySelector('[data-av]'), meetings.get(sheet.dataset.schedule), {
+        site, client, signal: stop.signal, onChange: () => { changed = true; },
+      });
+    }
+  }
 
   // A click on the dimmed backdrop closes the sheet, but only if the press
   // started there too (not when selecting text and releasing outside).
@@ -258,17 +433,86 @@ export function attachTimeline(root) {
       return;
     }
     const opener = event.target.closest('[data-open]');
-    if (opener) {
-      const sheet = sheetFor(opener.dataset.open);
-      if (!sheet || sheet.open) return;
-      sheet.showModal();
-      sheet.querySelector('.sheet-title')?.focus();
-      return;
-    }
+    if (opener) return openSheet(opener.dataset.open);
     if (event.target.closest('[data-action="close"]')) event.target.closest('dialog')?.close();
   }, { signal: stop.signal });
 
+  for (const sheet of root.querySelectorAll('dialog.tl-sheet')) {
+    sheet.addEventListener('close', () => {
+      if (!changed || !reload) return;
+      changed = false;
+      // After the sheet's own close handler (schedule.js) has sent a change
+      // that was still waiting. Redraw in place, focus back on the item.
+      setTimeout(async () => {
+        await sheet.querySelector('[data-av]')?.pending;
+        if (!stop.signal.aborted) reload({ keepView: true, focus: `[data-open="${CSS.escape(sheet.dataset.sheet)}"]` });
+      }, 0);
+    }, { signal: stop.signal });
+  }
+
+  const form = root.querySelector('form.tl-add');
+  if (form) wireAddForm(form, { site, client, reload, signal: stop.signal });
+
+  if (open) openSheet(open);
   detachCurrent = () => stop.abort();
+}
+
+function wireAddForm(form, { site, client, reload, signal }) {
+  const status = form.querySelector('.survey-status');
+  const sync = () => {
+    const kind = form.elements.kind.value;
+    for (const el of form.querySelectorAll('[data-for]')) el.hidden = el.dataset.for !== kind;
+  };
+  form.addEventListener('change', sync, { signal });
+  sync();
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const f = form.elements;
+    const say = (text, field) => {
+      status.textContent = text;
+      field?.focus();
+    };
+    const title = f.title.value.trim();
+    if (!title) return say('Give it a title.', f.title);
+    const length = Number(f.duration.value); // not "length": form.elements.length is the number of fields
+    let args;
+    if (f.kind.value === 'find') {
+      if (!f.from.value || !f.to.value || f.to.value < f.from.value) return say('Check the days: the last day can’t be before the first.', f.to);
+      const days = daysBetweenDates(f.from.value, f.to.value, { weekends: f.weekends.checked });
+      if (!days.length) return say('There are no weekdays between these days. Tick “Include Saturdays and Sundays”, or pick other days.', f.from);
+      if (days.length > 14) return say(`That’s ${days.length} days; 14 at most.`, f.to);
+      if (!f.start.value || !f.end.value || f.end.value <= f.start.value) return say('The latest end must be after the earliest start.', f.end);
+      args = {
+        p_course: site.course.id,
+        p_details: { title, duration_min: length },
+        p_schedule: { days, from: f.start.value, to: f.end.value, slot_min: 30, duration_min: length },
+      };
+    } else {
+      if (!f.date.value || !f.time.value) return say('Give the date and the time.', f.date);
+      const place = f.place.value.trim();
+      args = {
+        p_course: site.course.id,
+        p_details: {
+          title, duration_min: length, starts_at: zurichToDate(f.date.value, f.time.value).toISOString(),
+          ...(place ? { location_md: place } : {}),
+        },
+      };
+    }
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    say('Adding…');
+    try {
+      const { data, error } = await client.rpc('add_meeting', args);
+      if (error) throw new Error(error.message);
+      form.closest('dialog')?.close();
+      // Redraw with the new meeting and open its sheet (its availability grid).
+      await reload({ keepView: true, open: data.id });
+    } catch (err) {
+      say(`Couldn’t add it: ${err.message}`);
+      button.disabled = false;
+    }
+  }, { signal });
 }
 
 /** Scroll so that today sits in the middle of the screen. */

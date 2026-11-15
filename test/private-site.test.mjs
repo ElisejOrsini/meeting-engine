@@ -157,3 +157,32 @@ test('build: course.yml "home" adds a link back to another site in the header', 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('preview: the example adds ten teammates’ answers and an AI summary that matches them', async () => {
+  const lines = [];
+  const example = JSON.parse(await readFile('demo-private/example-responses.json', 'utf8'));
+  const backend = await createLocalBackend({
+    courseId: 'widgetry', courseName: 'Widgetry', siteUrl: SITE, importFrom: 'demo',
+    exampleFrom: 'demo-private/example-responses.json', log: (l) => lines.push(l),
+  });
+  assert.match(lines.join('\n'), /10 teammates answered/);
+  // The organizer hasn't answered, but the questions have an AI summary: the counts are visible.
+  const t = (await backend.rpc('get_tallies', { p_course: 'widgetry', p_meeting: example.meeting }, { githubId: 1001 })).body;
+  assert.deepEqual(t.locked, [], 'both survey questions have a summary, so nothing is locked');
+  const counts = (q, field) => Object.fromEntries(t.questions[q].fields.find((f) => f.id === field).counts.map((c) => [c.option, c.count]));
+  assert.equal(t.questions['grace-period'].answered, 10);
+  assert.deepEqual(counts('grace-period', 'preference'), { 'No grace period': 1, '15 minutes': 2, '1 hour': 5, '24 hours': 2 });
+  assert.equal(t.questions.penalty.answered, 9);
+  assert.equal(t.questions.penalty.skipped, 1, 'one teammate skipped');
+  assert.deepEqual(counts('penalty', 'options'), {
+    'Not accepted at all': 2, '10% deduction per day': 4, 'Accepted but only graded pass/fail': 3, 'Decided case by case by the head TA': 4,
+  }, 'the numbers in the example summary');
+
+  const course = (await backend.rpc('get_course', { p_course: 'widgetry' }, { githubId: 1001 })).body;
+  const site = toSite(course, { createMarkdown, engine: { version: 'test' }, backend: { course_id: 'widgetry' } });
+  const meeting = site.meetings.find((m) => m.id === example.meeting);
+  assert.match(meeting.summaries['grace-period'].consensus_html, /Half of the team wants a 1-hour grace period/);
+  assert.equal(meeting.summaries.penalty.contested, true);
+  assert.match(meeting.intro_html, /one late-submission rule/);
+  assert.equal(meeting.saved.in.by, 'OpenClaw (example) (agent)');
+});

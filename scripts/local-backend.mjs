@@ -8,6 +8,7 @@
 // Pretend people: 1001 you-in-preview (organizer), 1002 teammate-in-preview
 // (member), 4001 stranger-in-preview (on no team list).
 
+import { readFile } from 'node:fs/promises';
 import { setup, actor } from '../test/db-setup.mjs';
 import { importCourse } from './import.mjs';
 
@@ -19,7 +20,7 @@ export const LOCAL_USERS = {
 
 const STATUS = { 42501: 403, 42883: 404, PGRST202: 404 };
 
-export async function createLocalBackend({ courseId, courseName, siteUrl, importFrom, log = console.log }) {
+export async function createLocalBackend({ courseId, courseName, siteUrl, importFrom, exampleFrom, log = console.log }) {
   const db = await setup();
   const as = actor(db);
   await db.query(`insert into auth.identities values ($1, 'github', '4001')`, [LOCAL_USERS[4001].uid]);
@@ -77,6 +78,10 @@ export async function createLocalBackend({ courseId, courseName, siteUrl, import
     await db.query(`select private.refresh_meeting($1, id) from private.meetings where course_id = $1`, [courseId]);
   }
 
+  if (exampleFrom) {
+    for (const line of await addExample({ db, as, rpc, courseId, file: exampleFrom })) log(`  example: ${line}`);
+  }
+
   /** Node http handler for /rest/v1/rpc/*; returns false if the request isn't for it. */
   async function handle(req, res, pathname) {
     const match = /^\/rest\/v1\/rpc\/([a-z_]+)$/.exec(pathname);
@@ -105,4 +110,41 @@ export async function createLocalBackend({ courseId, courseName, siteUrl, import
   }
 
   return { db, rpc, handle };
+}
+
+/**
+ * Made-up survey answers from pretend teammates (GitHub ids 2001, 2002, …),
+ * then the In-meeting AI summary an agent would write from them, saved
+ * through the agent API like OpenClaw would. See demo-private/example-responses.json.
+ */
+async function addExample({ db, as, rpc, courseId, file }) {
+  const example = JSON.parse(await readFile(file, 'utf8'));
+  const { meeting } = example;
+  const uidOf = (i) => `00000000-0000-0000-0000-0000000020${String(i).padStart(2, '0')}`;
+  for (const [i, person] of example.people.entries()) {
+    await db.query(`insert into auth.identities values ($1, 'github', $2)`, [uidOf(i), String(2001 + i)]);
+    await db.exec('set role owner;');
+    await db.query(`insert into private.members (course_id, github_id, github_login, display_name) values ($1, $2, $3, $4)`,
+      [courseId, 2001 + i, person.login, person.name]);
+    await db.exec('reset role;');
+    for (const [question, answer] of Object.entries(example.answers[person.login] ?? {})) {
+      if (answer === 'skip') {
+        await as('authenticated', 'select public.skip_question($1, $2, $3)', [courseId, meeting, question], uidOf(i));
+      } else {
+        await as('authenticated', 'select public.save_answer($1, $2, $3, $4)', [courseId, meeting, question, JSON.stringify(answer)], uidOf(i));
+      }
+    }
+  }
+  const key = await rpc('create_agent_key', { p_course: courseId, p_label: 'OpenClaw (example)', p_permission: 'write' }, { githubId: 1001 });
+  const agentKey = key.body;
+  const current = (await rpc('agent_get_meeting', { meeting }, { agentKey })).body;
+  const content = current.in?.content ?? { items: [] };
+  const summaries = example.summary.questions;
+  const items = content.items.map((item) => (item.question && summaries[item.question] ? { ...item, ...summaries[item.question] } : item));
+  const saved = await rpc('agent_put_section', {
+    meeting, part: 'in', base_version: current.in?.version ?? 0,
+    content: { ...content, intro_md: example.summary.intro_md, items }, note: 'AI summary (example)',
+  }, { agentKey });
+  if (saved.status !== 200) throw new Error(`example summary: HTTP ${saved.status}: ${saved.body?.message}`);
+  return [`${example.people.length} teammates answered the survey of ${meeting}`, 'wrote the In-meeting AI summary as "OpenClaw (example)"'];
 }

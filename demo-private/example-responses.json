@@ -1,0 +1,86 @@
+{
+  "about": "Preview only (npm run dev:example): ten made-up teammates answer the survey of the demo meeting \"Late submission policy\", and \"summary\" is the In-meeting part an agent (OpenClaw) would write from their answers 30 minutes before the meeting. It shows what the In-meeting tab looks like with a real AI summary. Nothing here is real.",
+  "meeting": "2026-11-17-late-submissions",
+  "people": [
+    { "login": "mia-preview", "name": "Mia" },
+    { "login": "jonas-preview", "name": "Jonas" },
+    { "login": "lea-preview", "name": "Lea" },
+    { "login": "noah-preview", "name": "Noah" },
+    { "login": "sara-preview", "name": "Sara" },
+    { "login": "luca-preview", "name": "Luca" },
+    { "login": "nina-preview", "name": "Nina" },
+    { "login": "tim-preview", "name": "Tim" },
+    { "login": "anja-preview", "name": "Anja" },
+    { "login": "felix-preview", "name": "Felix" }
+  ],
+  "answers": {
+    "mia-preview": {
+      "grace-period": { "preference": "1 hour", "reason": "Most late uploads I saw were upload timeouts a few minutes after midnight. One hour covers that without inviting people to start late." },
+      "penalty": { "options": ["10% deduction per day"] }
+    },
+    "jonas-preview": {
+      "grace-period": { "preference": "15 minutes", "reason": "15 minutes is enough for upload hiccups. An hour just moves the deadline to 1 am." },
+      "penalty": { "options": ["Not accepted at all", "Decided case by case by the head TA"] }
+    },
+    "lea-preview": {
+      "grace-period": { "preference": "1 hour", "reason": "Exchange students in other time zones had trouble with the exact cut-off. One hour is a fair buffer, as long as it is announced clearly." },
+      "penalty": { "options": ["10% deduction per day", "Decided case by case by the head TA"] }
+    },
+    "noah-preview": {
+      "grace-period": { "preference": "24 hours", "reason": "Several students in my group work part-time. A 24-hour window, no questions asked, would replace most of the extension emails." },
+      "penalty": { "options": ["Accepted but only graded pass/fail"] }
+    },
+    "sara-preview": {
+      "grace-period": { "preference": "1 hour", "reason": "1 hour is fine, but only if every group gets the same rule. Consistency matters more to students than the exact number." },
+      "penalty": { "options": ["10% deduction per day"] }
+    },
+    "luca-preview": {
+      "grace-period": { "preference": "No grace period", "reason": "A deadline is a deadline. After two weeks, any grace period becomes the real deadline." },
+      "penalty": { "options": ["Not accepted at all"] }
+    },
+    "nina-preview": {
+      "grace-period": { "preference": "1 hour" },
+      "penalty": { "options": ["10% deduction per day", "Accepted but only graded pass/fail"] }
+    },
+    "tim-preview": {
+      "grace-period": { "preference": "15 minutes", "reason": "Keep the grace period short and for technical problems only. Anything longer should go through an extension request." },
+      "penalty": { "options": ["Decided case by case by the head TA"] }
+    },
+    "anja-preview": {
+      "grace-period": { "preference": "24 hours", "reason": "24 hours would save us many individual emails, and we only start grading two days later anyway." },
+      "penalty": { "options": ["Accepted but only graded pass/fail", "Decided case by case by the head TA"] }
+    },
+    "felix-preview": {
+      "grace-period": { "preference": "1 hour" },
+      "penalty": "skip"
+    }
+  },
+  "summary": {
+    "intro_md": "**Goal:** one late-submission rule for the rest of the semester, to announce in next week's lecture.",
+    "questions": {
+      "grace-period": {
+        "short": "Grace period: 1 hour?",
+        "consensus_md": "**Half of the team wants a 1-hour grace period** (5 of 10). Two prefer 15 minutes, two prefer 24 hours, and one wants none. Almost everyone who explained their choice agrees that the rule must be **the same for every group** and announced clearly.",
+        "key_points": [
+          "Most late uploads are technical (upload timeouts a few minutes after the deadline).",
+          "Concern: a long grace period quietly becomes the real deadline.",
+          "A 24-hour window could replace most extension emails (2 people)."
+        ],
+        "contested": false
+      },
+      "penalty": {
+        "short": "After the grace period: deduction or case by case?",
+        "consensus_md": "**No clear majority.** A 10% deduction per day and a case-by-case decision by the head TA have the most support (4 of 9 each). Three would accept late work but grade it pass/fail; two would not accept it at all. One person skipped the question.",
+        "key_points": [
+          "Several people chose more than one option, so a combination is possible.",
+          "Only 2 of 9 want to refuse late work completely."
+        ],
+        "contested": true,
+        "disagreement_md": "The split is **a fixed rule versus judgement**. Those for a 10% deduction want something predictable for students; those for case by case want room for illness and emergencies. A combination (10% per day, which the head TA can waive) might work for both sides."
+      },
+      "extensions": {
+        "short": "Who approves extensions, and how fast?"
+      }
+    }
+  }
+}

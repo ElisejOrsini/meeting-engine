@@ -130,11 +130,19 @@ black text); navigation links and buttons are not.
   the AI summary isn't written, a notice with a live countdown ("in 2 h 14
   min", then "in 12:34", then "being written…"); **To decide**: one card per
   question with a round number, the one-line `short` version as the headline,
-  "AI summary" (footnote label + callout text), "Where people disagree"
-  (orange label) for contested questions, key points in secondary text, the
-  vote bars folded under "N answers ›" once a summary exists (open before),
-  and "Full question and background ›" folded; then the agenda; the meeting
-  guide folded at the end.
+  "AI summary" (footnote label + callout text), then the **results chart**,
+  "Where people disagree" (orange label) for contested questions, key points
+  in secondary text, and "Full question and background ›" folded; then the
+  agenda; the meeting guide folded at the end.
+- **Results chart** (one per choice field, under the AI summary): a
+  `--surface-2` box with the field's label and "10 answers · 1 skipped"
+  (plus "more than one choice allowed"), then one row per option in the
+  survey's order: label, a thin bar (10 px, flat at the baseline, 4 px
+  rounded at the value, on a `--fill` track) and "5 · 50%". One hue only: the
+  leading option(s) in `--accent-fill` with the label in primary semibold,
+  the others in `--chart-other` (lighter accent). Every bar is labelled with
+  its count and share, so nothing depends on colour; no legend needed. On
+  phones the bar moves under its label.
 
 - **Timeline** (`#/timeline`, design and reasons in
   [timeline-design/DECISION.md](timeline-design/DECISION.md)): one vertical
@@ -150,6 +158,31 @@ black text); navigation links and buttons are not.
   grey chip and label. A click opens a sheet (same component as the survey
   sheets) with the facts, the summary, the decisions (green ✓) and "Open
   meeting".
+- **Planned meeting** (still finding a time): chip with a clock and a dashed
+  outline; the card is transparent with a filled "Add your times" / "Change
+  your times" pill. Near today its days sit in a rounded `--accent-tint` band
+  with a thickened, translucent accent line; the days offered in the grid are
+  in accent. Far from today only its row is shaded, with "until Fri 27".
+- **Availability sheet** (wide sheet, 58rem): "Your times" (drag a rectangle;
+  it adds if the press started on a free slot, removes otherwise; arrow keys
+  and Space; past slots hatched) and "Everyone" (heat map, darker = more
+  people free; pointing, tapping or focusing a slot names who is free, not
+  free and hasn't answered). Side by side from 860 px, a segmented switch
+  below. Saves by itself ("Saving…" → "Saved"). Then the agent's suggestion
+  in an `--accent-tint` callout, "Best times for 1 hour" as a grouped list,
+  and for organizers "Pick" (secondary, small) with an inline confirmation,
+  and "Stop finding a time" (orange text button).
+- **Finding a time, elsewhere:** in the meetings list such a meeting says
+  "Time not set yet · finding a time, Mon 23 – Fri 27 Nov" and has a second,
+  inset row "Add your availability" (accent text, "3 of 11 answered",
+  chevron) that opens its grid on the timeline. Its page shows an
+  `--accent-tint` notice under the facts with the same button (primary,
+  small).
+- **"+ Add"** (organizers, small secondary button next to the Timeline title):
+  a sheet with "Find a time for a meeting" or "Meeting with a fixed time".
+- **Calendar actions** under a meeting's facts, for meetings still ahead:
+  "Add to calendar" (an .ics file) and, for organizers, "Send Outlook invite"
+  (opens a prefilled Outlook event in a new tab), both plain text buttons.
 
 ## Motion
 

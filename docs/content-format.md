@@ -91,8 +91,9 @@ responses:
   # anytime: anyone on the team can click "Show other responses", answered or not
   # after_answering: for each question, the button only works once you've
   #   answered or skipped it yourself (avoids anchoring); the In-meeting
-  #   vote counts follow the same rule and open for everyone 30 minutes
-  #   before the meeting
+  #   vote counts follow the same rule and open for everyone once the
+  #   question has an AI summary, at the latest 30 minutes before the meeting
+  #   (private courses)
   anonymous: false                # optional, default false; true: teammates see
                                   # the answers but not who gave them
 

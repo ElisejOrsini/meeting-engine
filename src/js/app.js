@@ -12,7 +12,8 @@
 // is loaded from the database after sign-in (private.js), and dropped again
 // on sign-out.
 
-import { html } from './dom.js';
+import { html, link } from './dom.js';
+import { downloadIcs } from './calendar.js';
 import { onAuth, startAuth, takeAuthRedirect } from './auth.js';
 import { attachSurveys, detachSurveys } from './surveys.js';
 import { attachInMeeting, detachInMeeting } from './inmeeting.js';
@@ -30,6 +31,7 @@ let lastPath = null;
 let auth = { status: 'loading', login: null, client: null };
 let loadGeneration = 0;
 let loadError = null;
+let pendingOpen = null; // a timeline sheet to open on the next redraw
 
 function parseHash() {
   const hash = location.hash.replace(/^#\/?/, '');
@@ -89,7 +91,13 @@ function route() {
     if (!meeting) show(notFoundView('There is no meeting with this address.'), 'meetings');
     else if (!TABS.some((t) => t.id === tab)) show(notFoundView(), 'meetings');
     else {
-      show(meetingView(meeting, tab, undefined, { organizer: site.me?.organizer === true }), 'meetings');
+      const pageUrl = new URL(link('m', meeting.id), location.href).href;
+      show(meetingView(meeting, tab, undefined, {
+        organizer: site.me?.organizer === true, pageUrl, members: site.members?.length ?? 0,
+      }), 'meetings');
+      main.querySelector('[data-ics]')?.addEventListener('click', () => {
+        downloadIcs(meeting, { url: pageUrl, courseId: site.course.id ?? site.backend?.course_id });
+      });
       if (tab === 'pre') attachSurveys(main, meeting, site.backend);
       if (tab === 'during') attachInMeeting(main, meeting, site.backend);
       if (site.private) attachPublish(main, context);
@@ -101,7 +109,14 @@ function route() {
       lastPath = 'timeline';
     }
     show(timelineView(site), 'timeline');
-    attachTimeline(main);
+    // #/timeline?open=<meeting>: open that meeting's sheet (links from the agent).
+    const open = params.get('open') ?? pendingOpen;
+    pendingOpen = null;
+    if (params.has('open')) {
+      history.replaceState(null, '', '#/timeline');
+      lastPath = 'timeline';
+    }
+    attachTimeline(main, { ...context, open });
   } else if (parts[0] === 'team' && parts.length === 1 && site.private) {
     show(teamView(site), 'team');
     attachTeam(main, context);
@@ -125,8 +140,12 @@ function route() {
   }
 }
 
-/** Private courses: (re)load the content from the database and redraw. */
-async function loadPrivate() {
+/**
+ * Private courses: (re)load the content from the database and redraw.
+ * keepView: redraw in place (same scroll position, focus on `focus`), e.g.
+ * after a sheet saved something. open: a timeline sheet to open afterwards.
+ */
+async function loadPrivate({ keepView = false, focus = null, open = null } = {}) {
   const mine = ++loadGeneration;
   const { client } = auth;
   if (!client) return;
@@ -145,8 +164,14 @@ async function loadPrivate() {
     site = null;
     loadError = `Couldn’t load the meetings: ${err.message}`;
   }
-  lastPath = null;
+  const y = window.scrollY;
+  if (!keepView || !site) lastPath = null;
+  pendingOpen = open;
   route();
+  if (keepView && site) {
+    window.scrollTo(0, y);
+    if (focus) main.querySelector(focus)?.focus({ preventScroll: true });
+  }
 }
 
 function followAuth(state) {

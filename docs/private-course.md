@@ -19,11 +19,13 @@ What you need first:
 
 ## 1. Update the database (once per Supabase project, per engine release)
 
-Private courses need parts 3 and 4 of the database setup, run in this order:
+Private courses need parts 3, 4 and 5 of the database setup, run in this order:
 
 - part 3: [`20261112120000_private_content.sql`](../supabase/migrations/20261112120000_private_content.sql)
 - part 4 (engine v0.6.0, In-meeting tab):
   [`20261114120000_in_meeting.sql`](../supabase/migrations/20261114120000_in_meeting.sql)
+- part 5 (engine v0.8.0, finding a time on the timeline):
+  [`20261114180000_scheduling.sql`](../supabase/migrations/20261114180000_scheduling.sql)
 
 For each file:
 

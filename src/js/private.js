@@ -86,6 +86,7 @@ function toMeeting(m, md) {
     time,
     duration: Number.isInteger(details.duration_min) ? details.duration_min : undefined,
     location_html: details.location_md ? md.inline(details.location_md) : '',
+    location: details.location_md ?? '', // as written (for calendar files)
     reveal: pre.responses?.reveal === 'after_answering' ? 'after_answering' : 'anytime',
     anonymous: pre.responses?.anonymous === true,
     background_html: block(pre.background_md),
@@ -113,6 +114,11 @@ function toMeeting(m, md) {
 export function toSite(data, { createMarkdown, engine, backend, semester = null }) {
   const md = createMarkdown({ files: false }); // no attachments in private courses (yet)
   const meetings = (data.meetings ?? []).map((m) => toMeeting(m, md));
+  // Meetings that are still finding a time (database part 5): their grid, short.
+  for (const schedule of data.schedules ?? []) {
+    const meeting = meetings.find((m) => m.id === schedule.meeting);
+    if (meeting) meeting.schedule = schedule;
+  }
   // Newest first, like the build; meetings without a time count as upcoming.
   meetings.sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999') || a.id.localeCompare(b.id));
   return {
