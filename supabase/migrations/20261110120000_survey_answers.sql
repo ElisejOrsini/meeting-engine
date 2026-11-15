@@ -315,10 +315,16 @@ grant execute on function private.answers_expired(date) to service_role;
 
 -- Every night at 03:17 UTC, if Supabase's scheduler (pg_cron) is available.
 -- (The website never shows expired answers either way.)
+-- (pg_cron is set up only once: on an installed pg_cron, "create extension"
+-- re-runs Supabase's own permission script, which then fails with
+-- "dependent privileges exist" and undoes this whole file.)
 do $$
 begin
-  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
-    create extension if not exists pg_cron with schema pg_catalog;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('meeting-engine-delete-old-answers', '17 3 * * *',
+      'select private.delete_old_answers()');
+  elsif exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    create extension pg_cron with schema pg_catalog;
     grant usage on schema cron to postgres;
     grant all privileges on all tables in schema cron to postgres;
     perform cron.schedule('meeting-engine-delete-old-answers', '17 3 * * *',

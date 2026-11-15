@@ -941,16 +941,18 @@ $$;
 
 revoke all on function private.delete_old_availability() from public, anon, authenticated, service_role;
 
--- Every night at 03:27 UTC, if Supabase's scheduler (pg_cron) is available.
+-- Every night at 03:27 UTC, with the scheduler (pg_cron) that part 2 set up.
 -- (The website and the agent never show expired availability either way.)
+-- Only uses it: "create extension" on an installed pg_cron re-runs
+-- Supabase's own permission script, which fails ("dependent privileges
+-- exist") and would undo this whole file.
 do $$
 begin
-  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
-    create extension if not exists pg_cron with schema pg_catalog;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
     perform cron.schedule('meeting-engine-delete-old-availability', '27 3 * * *',
       'select private.delete_old_availability()');
   else
-    raise notice 'pg_cron is not available: old availability is hidden, but not deleted';
+    raise notice 'pg_cron is not set up (part 2 does that): old availability is hidden, but not deleted';
   end if;
 end
 $$;

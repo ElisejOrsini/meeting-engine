@@ -25,7 +25,9 @@ Private courses need parts 3, 4 and 5 of the database setup, run in this order:
 - part 4 (engine v0.6.0, In-meeting tab):
   [`20261114120000_in_meeting.sql`](../supabase/migrations/20261114120000_in_meeting.sql)
 - part 5 (engine v0.8.0, finding a time on the timeline):
-  [`20261114180000_scheduling.sql`](../supabase/migrations/20261114180000_scheduling.sql)
+  [`20261114180000_scheduling.sql`](../supabase/migrations/20261114180000_scheduling.sql).
+  Use the file from v0.8.1 or later: the v0.8.0 file fails on Supabase with
+  "dependent privileges exist" (and changes nothing); just run the newer one.
 
 For each file:
 
